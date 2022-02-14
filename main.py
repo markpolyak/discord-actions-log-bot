@@ -44,9 +44,13 @@ class LogClient(discord.Client):
 
         report: [ReportEntry] = []
         for desc, time in list(map(lambda x: (x.embeds[0].description, x.created_at), messages)):
-            groups = re.match(r"\*\*<@!(.+?)>\s(.+?)\s", desc).groups()
+            groups = re.match(r"\*\*<@!(.+?)>\s(.+?)\s(.+?)<#(.+?)>", desc).groups()
             user_id = int(groups[0])
             joined = True if groups[1] == 'joined' else False
+            channel_id = int(groups[3])
+
+            if message.channel.guild.get_channel(channel_id).name != query.channel_name:
+                continue
 
             if joined:
                 entry = ReportEntry(user_id)
