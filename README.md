@@ -11,6 +11,8 @@ Current implementation is pretty rough and mostly MVP. To be improved in the fut
 
 ## Setting up bot
 
+Required: Python 3.10 and dependencies listed in `requirements.txt`.
+
 1. Register your new application at https://discord.com/developers/applications
 2. Create a bot for your application
 3. Turn on `SERVER MEMBERS INTENT` in your bot. This will allow it to see members of discord channel, which is needed
@@ -19,5 +21,14 @@ Current implementation is pretty rough and mostly MVP. To be improved in the fut
    * Check `bot` in `SCOPES`
    * Check in `BOT PERMISSIONS`: `Send Messages`, `Attach Files`, `Read Message History`, and `Read Messages/View Channels`.
    I'm not sure whether we need all of them, it worked for me even without all of them, but I did not test it precisely.
-5. Adjust setting to yours. You will need to provide bot token from Discord developer portal (`Bot > Token`), log channel,
+5. Adjust settings to yours. You will need to provide bot token from Discord developer portal (`Bot > Token`), log channel,
    command channel (to communicate with bot) and authorized group to which it will respond to only.
+6. Run the bot and set up necessary channels, roles
+7. Send a message in the `COMMAND_CHANNEL` containing channel name to take logs from, and two iso datetimes of start and end.
+   Example:
+   ```
+   General
+   2022-02-18T00:00:00+03:00
+   2022-02-18T02:00:00+03:00
+   ```
+   Timezone is optional. Timezone of output is currently always UTC.
