@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import re
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 import discord
 from discord import File
@@ -46,7 +46,7 @@ class LogClient(discord.Client):
         # TODO: Do we need to optimize user names queries here?
         rendered_report = ''
         for entry in report:
-            member_name = message.channel.guild.get_member(entry.user_id).nick
+            member_name = message.channel.guild.get_member(entry.user_id).display_name
             rendered_report += entry.render(member_name)
 
         # Send the report as file
@@ -77,6 +77,8 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
         user_id = int(groups[0])
         joined = True if groups[1] == 'joined' else False
         channel_id = int(groups[3])
+        if time:
+            time = time.replace(tzinfo=timezone.utc)
 
         if guild.get_channel(channel_id).name != query.channel_name:
             continue
@@ -86,14 +88,11 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
             entry.date_start = time
             report.append(entry)
         else:
-            joined_moment = len(report) - 1 - next(
-                (i for i, x in enumerate(reversed(report)) if x.user_id == user_id), None)
-            if joined_moment is not None:
-                report[joined_moment].date_end = time
-            else:
+            entry = next((x for x in reversed(report) if x.user_id == user_id), None)
+            if entry is None:
                 entry = ReportEntry(user_id)
-                entry.date_end = time
                 report.append(entry)
+            entry.date_end = time
 
     return report
 
@@ -138,15 +137,15 @@ class ReportEntry:
     def render(self, username: str) -> str:
         elapsed_time_s = ''
         if self.elapsed_time is not None:
-            elapsed_time_s = ReportEntry.strfdelta(self.elapsed_time, '{hours}:{minutes}:{seconds}')
+            elapsed_time_s = ReportEntry.strfdelta(self.elapsed_time, '{hours:02}:{minutes:02}:{seconds:02}')
 
         date_start_s = ''
         if self.date_start is not None:
-            date_start_s = self.date_start.isoformat()
+            date_start_s = self.date_start.astimezone().isoformat()
 
         date_end_s = ''
         if self.date_end is not None:
-            date_end_s = self.date_end.isoformat()
+            date_end_s = self.date_end.astimezone().isoformat()
 
         return f'{username}\t{date_start_s}\t{date_end_s}\t{elapsed_time_s}\n'
 
