@@ -109,10 +109,10 @@ class LogQuery:
 
     @classmethod
     def from_message(cls, message: str) -> LogQuery:
-        lines = message.splitlines()
-        channel_name = lines[0].strip()
-        date_start = datetime.fromisoformat(lines[1].strip())
-        date_end = datetime.fromisoformat(lines[2].strip())
+        items = message.replace(',', ';').replace('\n', ';').split(';')
+        channel_name = items[0].strip()
+        date_start = datetime.fromisoformat(items[1].strip()).astimezone()
+        date_end = datetime.fromisoformat(items[2].strip()).astimezone()
         return cls(channel_name, date_start, date_end)
 
 
