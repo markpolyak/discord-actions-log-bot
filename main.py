@@ -51,7 +51,7 @@ class LogClient(discord.Client):
 
         # Send the report as file
         await message.channel.send(
-            file=File(io.StringIO(rendered_report), filename=f'{datetime.now().isoformat()}-{query.channel_name}.tsv'))
+            file=File(io.StringIO(rendered_report), filename=f'{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.tsv'))
 
 
 async def get_log(log_channel: discord.TextChannel, query: LogQuery) -> [discord.Message]:
@@ -141,11 +141,11 @@ class ReportEntry:
 
         date_start_s = ''
         if self.date_start is not None:
-            date_start_s = self.date_start.astimezone().isoformat()
+            date_start_s = self.date_start.astimezone().isoformat(sep=' ', timespec='seconds')
 
         date_end_s = ''
         if self.date_end is not None:
-            date_end_s = self.date_end.astimezone().isoformat()
+            date_end_s = self.date_end.astimezone().isoformat(sep=' ', timespec='seconds')
 
         return f'{username}\t{date_start_s}\t{date_end_s}\t{elapsed_time_s}\n'
 
