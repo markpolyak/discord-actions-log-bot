@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import datetime
 import re
 import io
@@ -11,9 +13,13 @@ from discord import File
 from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGGING_BOT
 
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s :: %(levelname)s :: %(message)s')
+logger = logging.getLogger(__name__)
+
+
 class LogClient(discord.Client):
     async def on_ready(self):
-        print(f'Logged on as {self.user}!')
+        logger.info("Logged on as %s!", self.user)
 
     async def on_message(self, message: discord.Message):
         # TODO: Handle exceptions everywhere
@@ -23,7 +29,7 @@ class LogClient(discord.Client):
                 or ALLOWED_ROLE not in map(lambda x: x.name, message.author.roles)):
             return
 
-        print(f'Message from {message.author}: {message.content}')
+        logger.info("Message from %s: %s", message.author, message.content)
 
         # Parse message
         query = LogQuery.from_message(message.content)
@@ -40,6 +46,7 @@ class LogClient(discord.Client):
         # Get messages and parse them
         messages = await \
             get_log(log_channel, query)
+        logger.info("Retrieved %d messages", len(messages))
         report = parse_log(messages, query, guild)
 
         # Render a report
@@ -50,12 +57,14 @@ class LogClient(discord.Client):
             rendered_report += entry.render(member_name)
 
         # Send the report as file
+        filename = f"{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.tsv" #noqa
         await message.channel.send(
-            file=File(io.StringIO(rendered_report), filename=f'{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.tsv'))
+            file=File(io.StringIO(rendered_report), filename=filename))
 
 
 async def get_log(log_channel: discord.TextChannel, query: LogQuery) -> [discord.Message]:
     messages = await log_channel.history(
+        limit=None,
         after=convert_to_utc(query.date_start),
         before=convert_to_utc(query.date_end),
         oldest_first=True
@@ -73,14 +82,30 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
     report: [ReportEntry] = []
 
     for desc, time in list(map(lambda x: (x.embeds[0].description, x.created_at), messages)):
-        groups = re.match(r"\*\*<@!(.+?)>\s(.+?)\s(.+?)<#(.+?)>", desc).groups()
+        logger.debug("Parsing message %s sent at %s", desc, time)
+        match = re.match(r"\*\*<@!(.+?)>\s(.+?)\s(.+?)<#(.+?)>", desc)
+        if not match:
+            match = re.match(r"\*\*<@!(.+?)>\s(.+?)\s(.+?)`#(.+?)`\s->\s`#(.+?)`", desc)
+        if not match:
+            logger.error("Unable to parse message \"%s\" sent at %s", desc, time)
+            continue
+        groups = match.groups()
         user_id = int(groups[0])
-        joined = True if groups[1] == 'joined' else False
-        channel_id = int(groups[3])
+        # if groups[1] == 'joined' or (groups[1] == 'switched' and groups[4] == query.channel_name):
+        #     joined = True
+        if groups[1] == 'left' or (groups[1] == 'switched' and groups[3] == query.channel_name):
+            joined = False
+        else:
+            joined = True
+        # joined = True if groups[1] == 'joined' else False
+        channel_id = int(groups[3]) if groups[1] != 'switched' else None
         if time:
             time = time.replace(tzinfo=timezone.utc)
 
-        if guild.get_channel(channel_id).name != query.channel_name:
+        # check if this log event correspons to the voice channel in question
+        if channel_id and guild.get_channel(channel_id).name != query.channel_name:
+            continue
+        if groups[1] == 'switched' and query.channel_name not in [groups[3], groups[4]]:
             continue
 
         if joined:
