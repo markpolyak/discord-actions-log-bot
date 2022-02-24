@@ -13,7 +13,7 @@ from discord import File
 from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGGING_BOT
 
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s :: %(levelname)s :: %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s :: %(levelname)s :: %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -50,14 +50,28 @@ class LogClient(discord.Client):
         report = parse_log(messages, query, guild)
 
         # Render a report
+        if query.output_type == 'tsv':
+            sep = '\t'
+        elif query.output_type == 'csv':
+            sep = ','
+        elif query.output_type == 'excel':
+            sep = ';'
+            query.output_type = 'csv'
+        elif query.output_type == 'txt':
+            sep = '\t'
+            query.output_type = 'txt'
+        else:
+            logger.error("Unknown output format %s", query.output_type)
+            await message.channel.send(f"Unknown output format {query.output_type}")
+            return
         # TODO: Do we need to optimize user names queries here?
-        rendered_report = ''
+        rendered_report = f"\ufeffname{sep}joined_at{sep}left_at{sep}time_spent\n"
         for entry in report:
             member_name = message.channel.guild.get_member(entry.user_id).display_name
-            rendered_report += entry.render(member_name)
+            rendered_report += entry.render(member_name, sep=sep)
 
         # Send the report as file
-        filename = f"{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.tsv" #noqa
+        filename = f"{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.{query.output_type}" #noqa
         await message.channel.send(
             file=File(io.StringIO(rendered_report), filename=filename))
 
@@ -126,11 +140,13 @@ class LogQuery:
     channel_name: str
     date_start: datetime
     date_end: datetime
+    output_type: str
 
-    def __init__(self, channel_name: str, date_start: datetime, date_end: datetime):
+    def __init__(self, channel_name: str, date_start: datetime, date_end: datetime, output_type: str):
         self.channel_name = channel_name
         self.date_start = date_start
         self.date_end = date_end
+        self.output_type = output_type
 
     @classmethod
     def from_message(cls, message: str) -> LogQuery:
@@ -138,7 +154,9 @@ class LogQuery:
         channel_name = items[0].strip()
         date_start = datetime.fromisoformat(items[1].strip()).astimezone()
         date_end = datetime.fromisoformat(items[2].strip()).astimezone()
-        return cls(channel_name, date_start, date_end)
+        # if len(items) > 3:
+        output_type = items[3].strip() if len(items) > 3 else 'txt'
+        return cls(channel_name, date_start, date_end, output_type)
 
 
 class ReportEntry:
@@ -159,7 +177,7 @@ class ReportEntry:
         else:
             return None
 
-    def render(self, username: str) -> str:
+    def render(self, username: str, sep: str = '\t') -> str:
         elapsed_time_s = ''
         if self.elapsed_time is not None:
             elapsed_time_s = ReportEntry.strfdelta(self.elapsed_time, '{hours:02}:{minutes:02}:{seconds:02}')
@@ -172,7 +190,8 @@ class ReportEntry:
         if self.date_end is not None:
             date_end_s = self.date_end.astimezone().isoformat(sep=' ', timespec='seconds')
 
-        return f'{username}\t{date_start_s}\t{date_end_s}\t{elapsed_time_s}\n'
+        # return f'{username}\t{date_start_s}\t{date_end_s}\t{elapsed_time_s}\n'
+        return f'{sep}'.join([username, date_start_s, date_end_s, elapsed_time_s]) + '\n'
 
     @staticmethod
     def strfdelta(tdelta, fmt):
