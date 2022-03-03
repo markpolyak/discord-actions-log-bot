@@ -67,7 +67,12 @@ class LogClient(discord.Client):
         # TODO: Do we need to optimize user names queries here?
         rendered_report = f"\ufeffname{sep}joined_at{sep}left_at{sep}time_spent\n"
         for entry in report:
-            member_name = message.channel.guild.get_member(entry.user_id).display_name
+            member = message.channel.guild.get_member(entry.user_id)
+            if member:
+                member_name = member.display_name
+            else:
+                member_name = f"Unknown <{entry.user_id}>"
+                logger.error("Unknown user with id %d", entry.user_id)
             rendered_report += entry.render(member_name, sep=sep)
 
         # Send the report as file
