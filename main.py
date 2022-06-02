@@ -108,14 +108,7 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
             continue
         groups = match.groups()
         user_id = int(groups[0])
-        # if groups[1] == 'joined' or (groups[1] == 'switched' and groups[4] == query.channel_name):
-        #     joined = True
-        if groups[1] == 'left' or (groups[1] == 'switched' and groups[3] == query.channel_name):
-            joined = False
-        else:
-            joined = True
         # check if this log event correspons to the voice channel in question
-        logger.info("Message %s, parsed groups are %s", desc, groups)
         channel_list = []
         if groups[3].isnumeric():
             channel_list += [guild.get_channel(int(groups[3])).name]
@@ -128,12 +121,11 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
                 channel_list += [groups[4]]
         if query.channel_name not in channel_list:
             continue
-        # channel_id = int(groups[3]) if groups[1] != 'switched' else None
-        # if channel_id and guild.get_channel(channel_id).name != query.channel_name:
-        #     continue
-        # # logger.info("Message %s, parsed groups are %s", desc, groups)
-        # if groups[1] == 'switched' and query.channel_name not in [groups[3], groups[4]]:
-        #     continue
+        # is user joining or leaving voice channel?
+        if groups[1] == 'left' or (groups[1] == 'switched' and channel_list[0] == query.channel_name):
+            joined = False
+        else:
+            joined = True
 
         if time:
             time = time.replace(tzinfo=timezone.utc)
