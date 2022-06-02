@@ -124,6 +124,7 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
         # check if this log event correspons to the voice channel in question
         if channel_id and guild.get_channel(channel_id).name != query.channel_name:
             continue
+        logger.info("Message %s, parsed groups are %s", desc, groups)
         if groups[1] == 'switched' and query.channel_name not in [groups[3], groups[4]]:
             continue
 
