@@ -102,9 +102,7 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
 
     for desc, time in list(map(lambda x: (x.embeds[0].description, x.created_at), messages)):
         logger.debug("Parsing message %s sent at %s", desc, time)
-        match = re.match(r"\*\*<@!?(.+?)>\s(.+?)\s(.+?)<#(.+?)>", desc)
-        if not match:
-            match = re.match(r"\*\*<@!?(.+?)>\s(.+?)\s(.+?)[`<]#(.+?)[`>]\s->\s[`<]#(.+?)[`>]", desc)
+        match = re.match(r"\*\*<@!?(.+?)>\s(.+?)\s(.+?)[`<]#(.+?)[`>](?:\s->\s[`<]#(.+?)[`>])?", desc)
         if not match:
             logger.error("Unable to parse message \"%s\" sent at %s", desc, time)
             continue
@@ -116,17 +114,29 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
             joined = False
         else:
             joined = True
-        # joined = True if groups[1] == 'joined' else False
-        channel_id = int(groups[3]) if groups[1] != 'switched' else None
+        # check if this log event correspons to the voice channel in question
+        logger.info("Message %s, parsed groups are %s", desc, groups)
+        channel_list = []
+        if groups[3].isnumeric():
+            channel_list += [guild.get_channel(int(groups[3])).name]
+        else:
+            channel_list += [groups[3]]
+        if len(groups) > 4 and groups[4] is not None:
+            if groups[4].isnumeric():
+                channel_list += [guild.get_channel(int(groups[4])).name]
+            else:
+                channel_list += [groups[4]]
+        if query.channel_name not in channel_list:
+            continue
+        # channel_id = int(groups[3]) if groups[1] != 'switched' else None
+        # if channel_id and guild.get_channel(channel_id).name != query.channel_name:
+        #     continue
+        # # logger.info("Message %s, parsed groups are %s", desc, groups)
+        # if groups[1] == 'switched' and query.channel_name not in [groups[3], groups[4]]:
+        #     continue
+
         if time:
             time = time.replace(tzinfo=timezone.utc)
-
-        # check if this log event correspons to the voice channel in question
-        if channel_id and guild.get_channel(channel_id).name != query.channel_name:
-            continue
-        logger.info("Message %s, parsed groups are %s", desc, groups)
-        if groups[1] == 'switched' and query.channel_name not in [groups[3], groups[4]]:
-            continue
 
         if joined:
             entry = ReportEntry(user_id)
