@@ -102,9 +102,9 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
 
     for desc, time in list(map(lambda x: (x.embeds[0].description, x.created_at), messages)):
         logger.debug("Parsing message %s sent at %s", desc, time)
-        match = re.match(r"\*\*<@!(.+?)>\s(.+?)\s(.+?)<#(.+?)>", desc)
+        match = re.match(r"\*\*<@!?(.+?)>\s(.+?)\s(.+?)<#(.+?)>", desc)
         if not match:
-            match = re.match(r"\*\*<@!(.+?)>\s(.+?)\s(.+?)`#(.+?)`\s->\s`#(.+?)`", desc)
+            match = re.match(r"\*\*<@!?(.+?)>\s(.+?)\s(.+?)`#(.+?)`\s->\s`#(.+?)`", desc)
         if not match:
             logger.error("Unable to parse message \"%s\" sent at %s", desc, time)
             continue
