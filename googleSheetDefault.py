@@ -237,6 +237,13 @@ class GoogleSheet:
             convertAttendances.append(convertAttendanceSheet)   
         
         return convertAttendances
+    
+    def _dropInfoWthoutDate(self, infoArr, colDates):
+        actualInfo=[]
+        for indexSheet in range(len(colDates)):
+            if (colDates[indexSheet]>=0):
+                actualInfo.append(infoArr[indexSheet])
+        return actualInfo
         
     def getAllAttendanceInfoByDate(self, date):
         """
@@ -266,6 +273,12 @@ class GoogleSheet:
         # get convert attandances for every sheet        
         attendances=self._convert_attendances_to_standart(attendances, FIOs)
         
+        # Convert to actual info:
+        sheets = self._dropInfoWthoutDate(sheets, colDates)
+        FIOs = self._dropInfoWthoutDate(FIOs, colDates)
+        attendances = self._dropInfoWthoutDate(attendances, colDates)         
+        colDates = self._dropInfoWthoutDate(colDates, colDates)  
+
         return (sheets, FIOs, colDates, attendances)
 
 
