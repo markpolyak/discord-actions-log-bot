@@ -267,17 +267,16 @@ class GoogleSheet:
         
         colDates = self._get_all_col_dates(date, datesAttendance, startAttendance, sheets)
 
+        # Convert to actual info:
+        sheets = self._dropInfoWthoutDate(sheets, colDates)
+        FIOs = self._dropInfoWthoutDate(FIOs, colDates)     
+        colDates = self._dropInfoWthoutDate(colDates, colDates)  
+
         # get attandances for every sheet
         attendances=self._get_attendances(colDates, sheets, result)
         
         # get convert attandances for every sheet        
         attendances=self._convert_attendances_to_standart(attendances, FIOs)
-        
-        # Convert to actual info:
-        sheets = self._dropInfoWthoutDate(sheets, colDates)
-        FIOs = self._dropInfoWthoutDate(FIOs, colDates)
-        attendances = self._dropInfoWthoutDate(attendances, colDates)         
-        colDates = self._dropInfoWthoutDate(colDates, colDates)  
 
         return (sheets, FIOs, colDates, attendances)
 
