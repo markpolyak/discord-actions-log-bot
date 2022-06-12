@@ -204,7 +204,7 @@ class GoogleSheet:
         :param FIOs: FIO arrays for ALL sheets 
         """
         convertAttendances=[]
-        for indexSheet in range(len(sheets)):
+        for indexSheet in range(len(FIOs)):
             
             # if date doesn't exist - attendance doesn't exists
             if (attendances[indexSheet]==[]):
@@ -223,26 +223,51 @@ class GoogleSheet:
         
         return convertAttendances
         
+    def getAllAttendanceInfoByDate(self, date):
+        """
+        Convert attendance to similar size with FIO
+        
+        :param attendances: non convert attandance for ALL sheets
+        :param FIOs: FIO arrays for ALL sheets 
+        """
 
-googleTable = GoogleSheet()
+        # get all sheets
+        sheets=self.get_sheet_names()
 
-sheets=googleTable.get_sheet_names()
-print(sheets)
+        # get all info in every sheet
+        result = self.get_multiple_sheets_data(sheets)
+        
+        # get start position of dates and attendance, and also dates
+        startAttendance, datesAttendance = self.find_dates_and_ranges_attendance(sheets, result)
+        
+        # get FIOs for every sheet
+        FIOs = self.find_FIOs(sheets, result)
 
+        # get attandances for every sheet
+        attendances=self.get_attendances(date, datesAttendance, startAttendance, sheets, result)
+        
+        # get convert attandances for every sheet        
+        attendances=self.convert_attendance_to_standart(attendances, FIOs)
+        
+        return (sheets, FIOs, startAttendance, attendances)
 
-result = googleTable.get_multiple_sheets_data(sheets)
-print(result[sheets[0]])
+googleTable=None
+try:
+    googleTable = GoogleSheet()
+except:
+    print('Something wrong with the connection to GoogleSheet...')
 
-startAttendance, datesAttendance = googleTable.find_dates_and_ranges_attendance(sheets, result)
-print(startAttendance)
-print(datesAttendance)
+groups=[]
+FIOs=[]
+startAttendance=[]
+attendances=[]
 
-FIOs = googleTable.find_FIOs(sheets, result)
+#try:
+groups, FIOs, startAttendance, attendances =  googleTable.getAllAttendanceInfoByDate('09.04')
+#except Exception:
+#    print('Something wrong with the connection to GoogleSheet or some mistake...')
+    
+print(groups)
 print(FIOs)
-
-date = '19.02'
-
-attendances=googleTable.get_attendances(date, datesAttendance, startAttendance, sheets, result)
-attendances=googleTable.convert_attendance_to_standart(attendances, FIOs)
-
+print(startAttendance)
 print(attendances)
