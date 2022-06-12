@@ -127,7 +127,20 @@ class GoogleSheet:
                     datesAttandance[indexSheet].append(sheetData[indexCol][self.row_start_date_attendance])             
         return (startAttandance, datesAttandance)
     
-        
+    def find_FIOs(self, sheets, multiple_sheets_data):
+    
+        sheetsFIOs=[]
+        for indexSheet in range(len(sheets)):
+            sheetData=multiple_sheets_data[sheets[indexSheet]]
+            FIOs=sheetData[self.col_start_FIOs]
+            
+            # delete upper rows
+            if (len(FIOs)>self.row_start_FIOs)
+                del FIOs[0 : self.row_start_FIOs-1]
+            sheetsFIOs.append(FIOs)
+        return sheetsFIOs   
+            
+            
 
 googleTable = GoogleSheet()
 
@@ -141,3 +154,5 @@ print(result[sheets[0]])
 startAttandance, datesAttandance = googleTable.find_dates_and_ranges_attandance(sheets, result)
 print(startAttandance)
 print(datesAttandance)
+
+FIOs = find_FIOs(sheets, result)
