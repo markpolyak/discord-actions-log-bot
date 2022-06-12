@@ -115,7 +115,6 @@ class GoogleSheet:
                 if (isAttandance):
                     if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self.row_start_date_attendance])!=None): 
                         # set exist date
-                        print(sheetData[indexCol][self.row_start_date_attendance])
                         datesAttandance[indexSheet].append(sheetData[indexCol][self.row_start_date_attendance])
                     else:
                         break 
@@ -135,8 +134,8 @@ class GoogleSheet:
             FIOs=sheetData[self.col_start_FIOs]
             
             # delete upper rows
-            if (len(FIOs)>self.row_start_FIOs)
-                del FIOs[0 : self.row_start_FIOs-1]
+            if (len(FIOs)>self.row_start_FIOs):
+                del FIOs[0 : self.row_start_FIOs]
             sheetsFIOs.append(FIOs)
         return sheetsFIOs   
             
@@ -155,4 +154,5 @@ startAttandance, datesAttandance = googleTable.find_dates_and_ranges_attandance(
 print(startAttandance)
 print(datesAttandance)
 
-FIOs = find_FIOs(sheets, result)
+FIOs = googleTable.find_FIOs(sheets, result)
+print(FIOs)
