@@ -10,22 +10,22 @@ from google.auth.transport.requests import Request
 
 class GoogleSheet:
     # If modifying these scopes, delete the file token.pickle.
-    # We need write access to the spreadsheet: https://developers.google.com/sheets/api/guides/authorizing
-    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+    # We need write access to the __spreadsheet: https://developers.google.com/sheets/api/guides/authorizing
+    SCOPES = ['https://www.googleapis.com/auth/__spreadsheets']
 
     # row, where start name attendance
-    row_start_name_attendance=0
+    _row_start_name_attendance=0
 
     # row, where start date
-    row_start_date_attendance=1
+    _row_start_date_attendance=1
 
     # col where start FIOs
-    col_start_FIOs=1
+    _col_start_FIOs=1
 
     # row where start FIOs
-    row_start_FIOs=2
+    _row_start_FIOs=2
 
-    spreadsheet = None
+    __spreadsheet = None
 
     def __init__(self):
         """
@@ -55,34 +55,34 @@ class GoogleSheet:
         service = build('sheets', 'v4', credentials=creds, cache_discovery=False)
 
         # Call the Sheets API
-        self.spreadsheet = service.spreadsheets()
+        self.__spreadsheet = service.spreadsheets()
 
 
-    def get_sheet_names(self):
+    def _get_sheet_names(self):
         """
         Get all sheet names that are present on the spreadsheet
         
-        :param spreadsheet: a service.spreadsheets() instance
+        :param __spreadsheet: a service.__spreadsheets() instance
         :returns: list with sheet names
         """
         sheets = []
-        result = self.spreadsheet.get(spreadsheetId=googleSheetSettings.google_spreadsheet_id).execute()
+        result = self.__spreadsheet.get(spreadsheetId=googleSheetSettings.google_spreadsheet_id).execute()
         for s in result['sheets']:
             sheets.append(s.get('properties', {}).get('title'))
         return sheets
 
 
-    def get_multiple_sheets_data(self, sheets, dimension='COLUMNS'):
+    def _get_multiple_sheets_data(self, sheets, dimension='COLUMNS'):
         """
         Get data from multiple sheets at once with a batchGet request
         
-        :param spreadsheet: a service.spreadsheets() instance
+        :param __spreadsheet: a service.__spreadsheets() instance
         :param sheets: a list of sheet names for which the data is to be retrieved
-        :param dimension: passed to spreadsheet.values().batchGet as a value of majorDimension param. Possible values are 'COLUMNS' or 'ROWS'
+        :param dimension: passed to __spreadsheet.values().batchGet as a value of majorDimension param. Possible values are 'COLUMNS' or 'ROWS'
         :returns: dict with sheet name as key and data as value
         """
         data = {}
-        request = self.spreadsheet.values().batchGet(spreadsheetId=googleSheetSettings.google_spreadsheet_id, ranges=sheets, majorDimension=dimension)
+        request = self.__spreadsheet.values().batchGet(spreadsheetId=googleSheetSettings.google_spreadsheet_id, ranges=sheets, majorDimension=dimension)
         response = request.execute()
         for i in range(0, len(response.get('valueRanges'))):
             data[sheets[i]] = response.get('valueRanges')[i].get('values')
@@ -90,7 +90,7 @@ class GoogleSheet:
       
 
       
-    def find_dates_and_ranges_attendance(self, sheets, multiple_sheets_data):
+    def _find_dates_and_ranges_attendance(self, sheets, multiple_sheets_data):
         """
         Get range array of start and end position lectures for every sheet
         Get array of dates lectures for every sheet
@@ -109,24 +109,24 @@ class GoogleSheet:
             isattendance=False
             for indexCol in range(len(sheetData)):
                 # if not enough rows
-                if (len(sheetData[indexCol])-1<self.row_start_date_attendance):
+                if (len(sheetData[indexCol])-1<self._row_start_date_attendance):
                     continue
                     
                 if (isattendance):
-                    if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self.row_start_date_attendance])!=None): 
+                    if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self._row_start_date_attendance])!=None): 
                         # set exist date
-                        datesattendance[indexSheet].append(sheetData[indexCol][self.row_start_date_attendance])
+                        datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])
                     else:
                         break 
                 # if wind key-word - is start of attendance
-                elif (sheetData[indexCol][self.row_start_name_attendance]==googleSheetSettings.name_of_attendance):
+                elif (sheetData[indexCol][self._row_start_name_attendance]==googleSheetSettings.name_of_attendance):
                     startattendance.append(indexCol)
                     isattendance=True
                     # set exist date
-                    datesattendance[indexSheet].append(sheetData[indexCol][self.row_start_date_attendance])             
+                    datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])             
         return (startattendance, datesattendance)
     
-    def find_FIOs(self, sheets, multiple_sheets_data):
+    def _find_FIOs(self, sheets, multiple_sheets_data):
         """
         Get array of FIO students for every sheet
         
@@ -137,15 +137,15 @@ class GoogleSheet:
         sheetsFIOs=[]
         for indexSheet in range(len(sheets)):
             sheetData=multiple_sheets_data[sheets[indexSheet]]
-            FIOs=sheetData[self.col_start_FIOs]
+            FIOs=sheetData[self._col_start_FIOs]
             
             # delete upper rows
-            if (len(FIOs)>self.row_start_FIOs):
-                del FIOs[0 : self.row_start_FIOs]
+            if (len(FIOs)>self._row_start_FIOs):
+                del FIOs[0 : self._row_start_FIOs]
             sheetsFIOs.append(FIOs)
         return sheetsFIOs   
     
-    def get_col_date(self, date, dates, startDate):
+    def _get_col_date(self, date, dates, startDate):
         """
         Get col date position in googleSheet
         
@@ -155,39 +155,54 @@ class GoogleSheet:
         :param sheets: a list of sheet names for which the data is to be retrieved
         :param multiple_sheets_data: a list of data for every sheet in sheets
         """
-        index = dates.index(date)
-        if (index<0):
-            return -1
-        else:
-            return index+startDate
         
+        try:
+            return dates.index(date)+startDate
+        except:
+            return -1
 
-    def get_attendances(self, date, dates, startDate, sheets, multiple_sheets_data):
+    
+    def _get_all_col_dates(self, date, dates, startDates, sheets):
+        """
+        Get col date position in googleSheet for all sheets
+        
+        :param date: the date of lecture
+        :param dates: all dates, which we have for current sheet
+        :param startDate: index col, where start the dates    
+        :param sheets: a list of sheet names for which the data is to be retrieved
+        """
+
+        colDates = []
+        
+        for indexSheet in range(len(sheets)):
+            colDate=self._get_col_date(date, dates[indexSheet], startDates[indexSheet])
+                        # if date not exist for group
+
+            colDates.append(colDate)
+        return colDates
+
+    def _get_attendances(self, colDates, sheets, multiple_sheets_data):
         """
         Get array of attendance for All date and sheet
         
-        :param date: the date of lecture
-        :param dates: all dates, which we have for all sheets
-        :param startDate: index col, where start the dates    
+        :param colDates: col date position in googleSheet for all sheets
         :param sheets: a list of sheet names for which the data is to be retrieved
         :param multiple_sheets_data: a list of data for every sheet in sheets
         """
-        
-        
+
         
         attendances=[]
         for indexSheet in range(len(sheets)):
             sheetData=multiple_sheets_data[sheets[indexSheet]]
-            colDate = self.get_col_date(date, dates[indexSheet], startDate[indexSheet])
             
             # if date not exist for group
-            if (colDate<0):
+            if (colDates[indexSheet]<0):
                attendances.append([]) 
                continue
 
-            attendanceSheet=sheetData[colDate]
+            attendanceSheet=sheetData[colDates[indexSheet]]
             # delete upper rows
-            for index in range(0, self.row_start_date_attendance+1):
+            for index in range(0, self._row_start_date_attendance+1):
                 if (len(attendanceSheet)<=0):
                     break;
                 del attendanceSheet[0]
@@ -196,9 +211,9 @@ class GoogleSheet:
         
         return attendances
         
-    def convert_attendance_to_standart(self, attendances, FIOs):
+    def _convert_attendances_to_standart(self, attendances, FIOs):
         """
-        Convert attendance to similar size with FIO
+        Convert attendances to similar size with FIO
         
         :param attendances: non convert attandance for ALL sheets
         :param FIOs: FIO arrays for ALL sheets 
@@ -232,25 +247,29 @@ class GoogleSheet:
         """
 
         # get all sheets
-        sheets=self.get_sheet_names()
+        sheets=self._get_sheet_names()
 
         # get all info in every sheet
-        result = self.get_multiple_sheets_data(sheets)
+        result = self._get_multiple_sheets_data(sheets)
         
         # get start position of dates and attendance, and also dates
-        startAttendance, datesAttendance = self.find_dates_and_ranges_attendance(sheets, result)
+        startAttendance, datesAttendance = self._find_dates_and_ranges_attendance(sheets, result)
         
         # get FIOs for every sheet
-        FIOs = self.find_FIOs(sheets, result)
+        FIOs = self._find_FIOs(sheets, result)
+        
+        colDates = self._get_all_col_dates(date, datesAttendance, startAttendance, sheets)
 
         # get attandances for every sheet
-        attendances=self.get_attendances(date, datesAttendance, startAttendance, sheets, result)
+        attendances=self._get_attendances(colDates, sheets, result)
         
         # get convert attandances for every sheet        
-        attendances=self.convert_attendance_to_standart(attendances, FIOs)
+        attendances=self._convert_attendances_to_standart(attendances, FIOs)
         
-        return (sheets, FIOs, startAttendance, attendances)
+        return (sheets, FIOs, colDates, attendances)
 
+
+# Body Of some external Function
 googleTable=None
 try:
     googleTable = GoogleSheet()
