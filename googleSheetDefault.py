@@ -1,5 +1,7 @@
 import googleSheetSettings
 
+import re
+
 import pickle
 import os.path
 from googleapiclient.discovery import build
@@ -15,10 +17,7 @@ class GoogleSheet:
     row_start_name_attendance=0
 
     # row, where start date
-    row_start_date_attendance=2
-
-    # row, where start attendance
-    row_start_name_attendance=2
+    row_start_date_attendance=1
 
     # col where start FIOs
     col_start_FIOs=1
@@ -88,6 +87,46 @@ class GoogleSheet:
         for i in range(0, len(response.get('valueRanges'))):
             data[sheets[i]] = response.get('valueRanges')[i].get('values')
         return data
+      
+
+      
+    def find_dates_and_ranges_attandance(self, sheets, multiple_sheets_data):
+        """
+        Get range array of start and end position lectures for every sheet
+        Get array of dates lectures for every sheet
+        
+        :param sheets: a list of sheet names for which the data is to be retrieved
+        :param multiple_sheets_data: a list of data for every sheet in sheets
+        """
+        startAttandance=[]
+        datesAttandance=[]
+        for indexSheet in range(len(sheets)):
+
+            datesAttandance.append([])
+            sheetData=multiple_sheets_data[sheets[indexSheet]]
+            
+            # flag of Attandance
+            isAttandance=False
+            for indexCol in range(len(sheetData)):
+                # if not enough rows
+                if (len(sheetData[indexCol])-1<self.row_start_date_attendance):
+                    continue
+                    
+                if (isAttandance):
+                    if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self.row_start_date_attendance])!=None): 
+                        # set exist date
+                        print(sheetData[indexCol][self.row_start_date_attendance])
+                        datesAttandance[indexSheet].append(sheetData[indexCol][self.row_start_date_attendance])
+                    else:
+                        break 
+                # if wind key-word - is start of attendance
+                elif (sheetData[indexCol][self.row_start_name_attendance]==googleSheetSettings.name_of_attendance):
+                    startAttandance.append(indexCol)
+                    isAttandance=True
+                    # set exist date
+                    datesAttandance[indexSheet].append(sheetData[indexCol][self.row_start_date_attendance])             
+        return (startAttandance, datesAttandance)
+    
         
 
 googleTable = GoogleSheet()
@@ -96,5 +135,9 @@ sheets=googleTable.get_sheet_names()
 print(sheets)
 
 
-result = googleTable.get_multiple_sheets_data(sheets[0])
-print(result)
+result = googleTable.get_multiple_sheets_data(sheets)
+print(result[sheets[0]])
+
+startAttandance, datesAttandance = googleTable.find_dates_and_ranges_attandance(sheets, result)
+print(startAttandance)
+print(datesAttandance)
