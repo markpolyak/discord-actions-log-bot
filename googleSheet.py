@@ -24,14 +24,23 @@ NOT_EXIST_SIMILAR=False
 # Или человек с именем Надыргулов Иль9  написал в Шутку: Надыргулов Иль9 а потом написал 433, а существуют группы 9433 и 433
 notExistSimilar=NOT_EXIST_SIMILAR
 
+# класс перечислений вариантов алгоритма
+class variantsOfAlgoritm(enum.Enum):
+        withSpaceAndUpperBegin = 1 # приводим к пробелам и к верхнему регистру начало
+        withSpaceAndUpperBeginAndLowerAnother= 2 # приводим к пробелам и к верхнему регистру начало, отсальное к нижнему     
+        withUpperBegin = 3 # приводим только к верхнему регистру начало
+        withUpperBeginAndLowerAnother = 4 # приводим только к верхнему регистру начало, отсальное к нижнему
+        # WithoutSpaceAndUpperAlgoritm = 5 # без всего, обычно не срабатывает, 
+        
+
 class namePersonState(enum.Enum):
         UnknownName = 1 # не удалось получить имя
         NotExist = 2 # не нашли совпадения
         NotUnique = 3 # не уникален
         UniqueButNotEnough = 4 # мало информации, но уникален - Петров А или Петров
         # следующий вариант пока не проверяется
-        #differentVariantsByGroup = 5 # есть группы 4933 и 933 и нашелся человек, который есть в обоих группах - но будет добавлен в 4933
-        SuccessfulCompare = 6 # значение удачного выполнения
+        #differentVariantsByGroup = 6 # есть группы 4933 и 933 и нашелся человек, который есть в обоих группах - но будет добавлен в 4933
+        SuccessfulCompare = 5 # значение удачного выполнения
         
         
         # UnknownFIO = 2 # ФИО некорректно - нужно ли для преподавателя?
@@ -115,7 +124,7 @@ class GoogleSheetInfo:
 
 # привести к пробелам знаки
 def turnToSpacesSigns(stroka):
-    return re.sub(r'[^a-zA-Zа-яА-Я0-9]', " ",  stroka)
+    return re.sub(r'[^a-zA-Zа-яА-Я]', " ",  stroka)
     
 # удаляем все, кроме букв, чисел
 def delSigns(stroka):
@@ -220,10 +229,6 @@ def beginOfWordToUpRegister(stroka, toLower=False):
     
 # получаем составные части    
 def parseNameToParts(stroka):
-    # заменяем все символы на пробелы
-    stroka=turnToSpacesAllWthoutName(stroka)
-    # все символы начала приводим к верхнему регистру (т.е. после пробелов)
-    stroka=beginOfWordToUpRegister(stroka)
     # убираем все символы, кроме ФИО (пробелы также удаляются)
     stroka=delAllWthoutName(stroka)
     # парсим и получаем части ФИО
@@ -247,7 +252,7 @@ def getIndicesNickWithoutSignes(nick):
     for index in range(len(nick)):
         if (delSigns(nick[index])!=''):
             resultArr.append(index)
-    return resultArr;
+    return resultArr
     
         
     
@@ -371,29 +376,26 @@ def isExistFioCombination(compareResult):
             return True
    
    
-# Функция, которая пытается найти сопоставления путем приведения к Верхнему регистру начальных символов, а остальных к нижнему регистру
-def getPartsFormNickSpaceAlgoritm(nick):
-    # приводим к пробелам все знаки
-    nick=turnToSpacesSigns(nick)
+# Функция, которая пытается найти сопоставления путем приведения к Верхнему регистру начальных символов,
+# остальных к нижнему регистру, а также путем дальнейшего удаления знаков
+def getPartsFormNickSpaceAlgoritm(nick, variant):
+     # приводим к пробелам все знаки
+    if (variant==variantsOfAlgoritm.withSpaceAndUpperBegin or 
+        variant==variantsOfAlgoritm.withSpaceAndUpperBeginAndLowerAnother):
+        nick=turnToSpacesSigns(nick)
     # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
-    nick=beginOfWordToUpRegister(nick, True)
+    if (variant==variantsOfAlgoritm.withSpaceAndUpperBegin or
+        variant==variantsOfAlgoritm.withUpperBegin):
+        nick=beginOfWordToUpRegister(nick, True)   
+    # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
+    elif (variant==variantsOfAlgoritm.withSpaceAndUpperBeginAndLowerAnother or
+        variant==variantsOfAlgoritm.withUpperBeginAndLowerAnother):
+        nick=beginOfWordToUpRegister(nick)  
+
     # убираем все ненужное (знаки, спец. символы, пробелы) - достаточно было только пробелы
-    nick=delSigns(nick)
+    # nick=delSigns(nick)
     # Получаем составные части никнейма
     return parseNameToParts(nick)
-    
-    
-# Функция, которая пытается найти сопоставления путем приведения к  Верхнему регистру начальных символов и слития
-def getPartsFormNickSequenceAlgoritm(nick):
-    # все символы начала приводим к верхнему регистру (т.е. после пробелов)
-    nick=beginOfWordToUpRegister(nick)
-    # убираем все ненужное (знаки, спец. символы, пробелы) - достаточно было только пробелы
-    nick=delSigns(nick)
-    # Получаем составные части никнейма
-    return parseNameToParts(nick)
-
-
-#  
    
    
 # Функция сопоставления никнейма по массиву фамилий
@@ -453,33 +455,27 @@ def findFIOfromFIOsToNick(groups, googleSheetInfoArray, nick):
     parseNick=groupAndNick[1]
     print(parseNick)
     
-    # получаем никнейм по первому алгоритму
-    nickArr = getPartsFormNickSpaceAlgoritm(parseNick)
-    print(nickArr)
-    # получаем результат   
-    result, googleSheetInfoArray = compareNickAndFIOs(group, nickArr, googleSheetInfoArray)
-
-    # Если результат не Not exist - возвращаем результат
-    if (result != namePersonState.NotExist):
-        return result, googleSheetInfoArray
+    prevNickArrs=[]
+    nickArr=[]
+    for variant in list(variantsOfAlgoritm):
+        nickArr = getPartsFormNickSpaceAlgoritm(parseNick, variant)
+        print(nickArr)
+        # если количество элементов, полученных из ника слишком большое или слишком малое
+        if (len(nickArr)>3 or len(nickArr)<1):
+            continue
+        for prevNick in prevNickArrs:
+            if (compareArrsWthoutRegister(prevNick, nickArr)):
+                prevNickArrs.append(nickArr)
+                continue
+        # если здесь, то не было одинаковых
+        # получаем результат   
+        result, googleSheetInfoArray = compareNickAndFIOs(group, nickArr, googleSheetInfoArray)
+        # Если результат не Not exist - возвращаем результат
+        if (result != namePersonState.NotExist):
+            return result, googleSheetInfoArray
     
-    nickArrPrev=nickArr;
-    # пробуем второй вариант алгоритма     
-    nickArr = getPartsFormNickSequenceAlgoritm(parseNick)
-    print(nickArr)
-    # если полученные варианты равны, то возвращаем имеющийся результат
-    if (compareArrsWthoutRegister(nickArrPrev, nickArr)):
-        return result, googleSheetInfoArray
-    
-    # получаем результат   
-    result, googleSheetInfoArray = compareNickAndFIOs(group, nickArr, googleSheetInfoArray)
-
-    # возвращаем результат
-    return result, googleSheetInfoArray
-   
-   # В случае, если алогиритмов будет много, то их можно занести в цикл, который будет надстройкой над втроым случаем...
-   
-
+    # если здесь, то не нашли
+    return namePersonState.NotExist, googleSheetInfoArray
     
 
     
@@ -588,9 +584,10 @@ googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров'
 
 googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Борис', 'Аристархович'], ['Коваленко', 'Игорь']], [0, 0]))
 
-nicks=['dfв@49#3$3№петров андрей владимирович', 'игор4933']
-#nicks=['dfв@49#3$3№петровАндрейАладимирович', 'игор4933']
-
+#nicks=['dfв@49#3$3№петров андрей владимирович', 'игор4933']
+#nicks=['ПетровАндрdfв@49#3$3№ейВлад23432Имирович', 'игор4933']
+nicks=['dfв@49#3$3№петровАндрейВладимирович', 'игор4933']
+#nicks=['Петров Андрей в4933', 'игор4933']
 # проставляем посещаемость по никнеймам
 resultWarnings, resultErrors, googleSheetInfoArray=setActualAttendance(groups, googleSheetInfoArray, nicks)
 
