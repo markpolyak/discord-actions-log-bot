@@ -26,12 +26,18 @@ notExistSimilar=NOT_EXIST_SIMILAR
 
 # класс перечислений вариантов алгоритма
 class variantsOfAlgoritm(enum.Enum):
-        withSpaceAndUpperBegin = 1 # приводим к пробелам и к верхнему регистру начало
-        withSpaceAndUpperBeginAndLowerAnother= 2 # приводим к пробелам и к верхнему регистру начало, отсальное к нижнему     
-        withUpperBegin = 3 # приводим только к верхнему регистру начало
-        withUpperBeginAndLowerAnother = 4 # приводим только к верхнему регистру начало, отсальное к нижнему
-        # WithoutSpaceAndUpperAlgoritm = 5 # без всего, обычно не срабатывает, 
-        
+        withSpace = 1 # приводим к пробелам
+        withUpperBegin = 2 # приводим к верхнему регистру начало
+        withUpperBeginAndLowerAnother = 3 # приводим к верхнему регистру начало, остальное к нижнему
+        #withReverseToRussian = 4
+
+dictVariantsOfAlgoritm = {
+    0 : [variantsOfAlgoritm.withSpace],
+    1 : [variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBegin],
+    2 : [variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBeginAndLowerAnother],
+    3 : [variantsOfAlgoritm.withUpperBegin],
+    4 : [variantsOfAlgoritm.withUpperBeginAndLowerAnother]
+}       
 
 class namePersonState(enum.Enum):
         UnknownName = 1 # не удалось получить имя
@@ -378,18 +384,15 @@ def isExistFioCombination(compareResult):
    
 # Функция, которая пытается найти сопоставления путем приведения к Верхнему регистру начальных символов,
 # остальных к нижнему регистру, а также путем дальнейшего удаления знаков
-def getPartsFormNickSpaceAlgoritm(nick, variant):
+def getPartsFormNickAlgoritm(nick, variants):
      # приводим к пробелам все знаки
-    if (variant==variantsOfAlgoritm.withSpaceAndUpperBegin or 
-        variant==variantsOfAlgoritm.withSpaceAndUpperBeginAndLowerAnother):
+    if variantsOfAlgoritm.withSpace in variants:
         nick=turnToSpacesSigns(nick)
     # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
-    if (variant==variantsOfAlgoritm.withSpaceAndUpperBegin or
-        variant==variantsOfAlgoritm.withUpperBegin):
+    if variantsOfAlgoritm.withUpperBeginAndLowerAnother in variants:
         nick=beginOfWordToUpRegister(nick, True)   
     # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
-    elif (variant==variantsOfAlgoritm.withSpaceAndUpperBeginAndLowerAnother or
-        variant==variantsOfAlgoritm.withUpperBeginAndLowerAnother):
+    elif variantsOfAlgoritm.withUpperBegin in variants:
         nick=beginOfWordToUpRegister(nick)  
 
     # убираем все ненужное (знаки, спец. символы, пробелы) - достаточно было только пробелы
@@ -457,8 +460,10 @@ def findFIOfromFIOsToNick(groups, googleSheetInfoArray, nick):
     
     prevNickArrs=[]
     nickArr=[]
-    for variant in list(variantsOfAlgoritm):
-        nickArr = getPartsFormNickSpaceAlgoritm(parseNick, variant)
+    
+    # пробегаемся по всем вариантам словаря
+    for variantIndex in range(len(dictVariantsOfAlgoritm)):
+        nickArr = getPartsFormNickAlgoritm(parseNick, dictVariantsOfAlgoritm[variantIndex])
         print(nickArr)
         # если количество элементов, полученных из ника слишком большое или слишком малое
         if (len(nickArr)>3 or len(nickArr)<1):
@@ -557,7 +562,7 @@ def getAndSetGoogleSheet(date, nicks):
     groups=[]
     
     # DELETE получаем группы
-    groups=['4933', 'M911']
+    groups=['в4933', '4933']
     
     # сортируем группы по длине строки, начиная от большей строки (иначе если будут группы M911 и 911,
     # то для 'Петров M911' если 911 первее - то будет ошибочно воспринято, что Петров из 911 группы)
@@ -585,8 +590,8 @@ googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров'
 googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Борис', 'Аристархович'], ['Коваленко', 'Игорь']], [0, 0]))
 
 #nicks=['dfв@49#3$3№петров андрей владимирович', 'игор4933']
-#nicks=['ПетровАндрdfв@49#3$3№ейВлад23432Имирович', 'игор4933']
-nicks=['dfв@49#3$3№петровАндрейВладимирович', 'игор4933']
+nicks=['ПетровАндрdfв@49#3$3№ейВлад23432 Имирович', 'игор4933']
+#nicks=['dfв@49#3$3№петровАндрейВладимирович', 'игор4933']
 #nicks=['Петров Андрей в4933', 'игор4933']
 # проставляем посещаемость по никнеймам
 resultWarnings, resultErrors, googleSheetInfoArray=setActualAttendance(groups, googleSheetInfoArray, nicks)
