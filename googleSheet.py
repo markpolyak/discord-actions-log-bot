@@ -121,33 +121,35 @@ dictResult={
 
 # очистка результата
 def clearDictResult():
+    global dictResult
     for result in dictResult:
         dictResult[result] = 0
 
 # инкрементация результата
 def incDictResult(result):
+    global dictResult
     if (result in [successState.SuccessfulCompare, warningState.CompareButNotEqual]):
-        ++result['updated']
-    elif (result == warningState.CompareButNotEqual):
-        ++result['alreadyUpdated']
-    else:
-        ++result['notUpdated']
+        print('0')
+        dictResult['updated']+=1
+    elif (result == warningState.AlreadySetAtendance):
 
-# инкриментация ошибки
-def incDictError():
-    ++result['errors']
-    
-# инкриментация предупреждения  
-def inctDictWarnings():
-    ++result['warnings']  
+        dictResult['alreadyUpdated']+=1
+    else:
+        dictResult['notUpdated']+=1
+
+        
+    if result in warningState:
+         dictResult['warnings']+=1
+    elif result in errorState:
+         dictResult['errors']+=1
 
 # перобразовать результат словаря в сообщение
 def dictResultToMessage():
-    return "Total already updated: " + dictResult['alreadyUpdated'] + '\n' + \
-        "Total updated: " + dictResult['updated'] +'\n' + \
-        "Total not updated: " + dictResult['notUpdated'] +'\n' + \
-        "Total errors: " + dictResult['errors'] +'\n' + \
-        "Total warnings: " + dictResult['warnings'] +'\n'
+    return "Total already updated: " + str(dictResult['alreadyUpdated']) + '\n' + \
+        "Total updated: " + str(dictResult['updated']) +'\n' + \
+        "Total not updated: " + str(dictResult['notUpdated']) +'\n' + \
+        "Total errors: " + str(dictResult['errors']) +'\n' + \
+        "Total warnings: " + str(dictResult['warnings']) +'\n'
 
 
 # преобразует массив вида [group, [arrfio, arrfio]] в строку вида "'group': 'f i o' 'f i o'; "
@@ -572,7 +574,7 @@ def findNickFromGroupAndFIO(groups, nick):
     global resultErrors
     global resultWarnings
 
-    isCompareButNotEqual = False # для случая недостаточной уникальности
+    isCompareButNotEqual = False # для случая нехватки данных
     isExistGroup = False # если группа существует
     results=[] # содержит группу и ФИО
 
@@ -589,6 +591,9 @@ def findNickFromGroupAndFIO(groups, nick):
             # convert result to string
             results = changeIndexOfFIOsResultToFIOs(groups, results)
             resultErrors.append(getErrorOrWarning(errorState.NotUnique, nick, results))
+            # increase result counter
+            incDictResult(errorState.NotUnique)
+            return 
         
         # Если резльтат успешное совпадение, то добавляем в конец
         if (result==successState.SuccessfulCompare):
@@ -609,9 +614,13 @@ def findNickFromGroupAndFIO(groups, nick):
         if (setAtendanceByResult(groups, results) == False):
             results=changeIndexOfFIOsResultToFIOs(groups, results[0])
             resultWarnings.append(getErrorOrWarning(warningState.AlreadySetAtendance, nick, results))  
+            # increase result counter
+            incDictResult(warningState.AlreadySetAtendance)
         else:
             # преобразум все индексы ФИО в ФИО
             results=changeIndexOfFIOsResultToFIOs(groups, results[0])
+            # increase result counter
+            incDictResult(successState.SuccessfulCompare)
         
         # случаи равенства
         if (isCompareButNotEqual):
@@ -627,12 +636,19 @@ def findNickFromGroupAndFIO(groups, nick):
         # если группа существует
         if (isExistGroup):
             resultErrors.append(getErrorOrWarning(errorState.NotExist, nick, results))
+            # increase result counter
+            incDictResult(errorState.NotExist)
         # если же не существует
         else:
             resultErrors.append(getErrorOrWarning(errorState.UnknownGroup, nick))
+            # increase result counter
+            incDictResult(errorState.UnknownGroup)
+            
     # если найдено больше двух совпадений (поиск по двум группам)
     else:
         resultErrors.append(getErrorOrWarning(errorState.NotUniqueByGroup, nick, results))
+        # increase result counter
+        incDictResult(errorState.NotUniqueByGroup)
 
 # функция, которая пробегается по каждому нику
 def findAllNicksFromGroupAndFIO(groups, nicks):
@@ -696,6 +712,7 @@ def getAtendancesForGoogleSheet():
 
 # функция, которая проставляет новую информацию по посещениям
 def setAtendanceFromNicksToGoogleSheet(date, nicks):
+    global dictResult
     # Обнуляем предупреждения и ошибки
     global resultWarnings
     global resultErrors
@@ -722,7 +739,6 @@ def setAtendanceFromNicksToGoogleSheet(date, nicks):
     #    print(element.getArrayOfPartsFIOs())
     #    print(element.getAtendanceArray())    
         
-    # TO DO RETURN DICT RESULT
     if (result==False):
         return result, '', resultWarnings, resultErrors
     
@@ -736,17 +752,18 @@ def setAtendanceFromNicksToGoogleSheet(date, nicks):
     
     # объединяем списки ошибок
     resultErrors+=sendErrors
-
-    return result, '', resultWarnings, resultErrors
+    
+    return result, dictResultToMessage(), resultWarnings, resultErrors
         
 
 # DELETE NICKS, BUT ON DISCORD STAGE
 nicks=['ПетровАндрdfB@49#3$3№ейВлад23432имирович', 'игор4933', 'русакова дарья 4933', '4933останин']
 
 
-result, notUsed, resWarnings, resErrors = setAtendanceFromNicksToGoogleSheet('09.04', nicks)
+result, messageResult, resWarnings, resErrors = setAtendanceFromNicksToGoogleSheet('09.04', nicks)
 
 
 print(result)
+print(messageResult)
 print(resWarnings)
 print(resErrors)
