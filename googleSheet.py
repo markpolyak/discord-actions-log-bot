@@ -62,8 +62,11 @@ class GoogleSheetInfo:
     def setAttendanceArrayByIndex(self, index, attendanceArrayElement=1):
         if index in range(len(self.__attendanceArray)):
             self.__attendanceArray[index] = attendanceArrayElement
-
-
+ 
+# special variants, which is not similar in lower in upper  
+fromRusToEngSpecial={'т':'t', 'в':'b','р':'r', 'Т':'T', 'В':'B', 'Р':'P'}
+# defaul variants, which is similar in lower in upper  
+fromRusToEngDefault={'К':'K', 'М':'M', 'Е':'E', 'С':'C', 'Х':'X', 'У':'Y', 'О':'O', 'А':'A'}
 
 # Предупреждения
 resultErrors=[]
@@ -199,20 +202,15 @@ def toGroupStandartSymb(symbGroup):
     if (symbGroup == 'р'):
         return 'r'
    
-    # to Up register
-    symbGroupConverted = symbGroup.upper()
-     # replace is too long
-    #group=group.replace("С", "C")
-   
-    # массивы русских и английских эквивалент
-    arrayRussian=['Т', 'В', 'К', 'М', 'Е', 'С', 'Х', 'Р', 'У', 'О', 'А']
-    arrayEnglish=['T', 'B', 'K', 'M', 'E', 'C', 'X', 'P', 'Y', 'O', 'A']
+    if symbGroup in fromRusToEngSpecial:
+       return fromRusToEngSpecial[symbGroup].upper()
     
-    for index in range(len(arrayRussian)):
-        if (symbGroupConverted==arrayRussian[index]):
-            return arrayEnglish[index]
-    # если же не особый случай, то возвращаем конвертированный символ
-    return symbGroupConverted
+    # to Up register   
+    symbGroup = symbGroup.upper()
+    if symbGroup in fromRusToEngDefault:
+        return fromRusToEngDefault[symbGroup]
+    else:
+        return symbGroup
     
 # сравниваем формат символов и их значения - для всех символов группы
 def compareFormatSymb(group, groupNick):
