@@ -1,6 +1,7 @@
 import googleSheetSettings
 
 import re
+import math
 
 import pickle
 import os.path
@@ -25,7 +26,15 @@ class GoogleSheet:
     # row where start FIOs
     _row_start_FIOs=2
 
+    # rows begin in google Sheet with 1, not 0
+    _shift_rows=1
+
+    # length English Words 26-1
+    _len_English_Sub=26
+  
+    # our Sheets
     __spreadsheet = None
+    
 
     def __init__(self):
         """
@@ -270,7 +279,8 @@ class GoogleSheet:
         for array in infoArray:
             lenArray.append(len(array))
         return lenArray
-        
+
+    
     def getAllAtendanceInfoByDate(self, date):
         """
         Get all necessary info by googleSheetSettings, static params and date.
@@ -312,38 +322,61 @@ class GoogleSheet:
         
         # get convert atendances for every sheet        
         atendances = self._convert_atendances_to_standart(atendances, lenArray)
-
+        
         return (sheets, FIOs, colPositionDates, atendances)
 
-    def _setAtendanceInfoForSheet(self, sheet, colPositionDate, attandance):
-        """
-        Get all necessary info by googleSheetSettings, static params and date.
-        
-        !Attention: if we dont have any information, than returns: [] for all param
-        
-        :param date: non convert attandance for ALL sheets
-        :param FIOs: FIO arrays for ALL sheets 
-        :returns:   sheets - names of all sheets (equal groups)
-                    FIOs - array of array FIO for every group
-                    colPositionDates - array of horizontal position of the date and Atendances
-                    atendances - array of array atendances for avery group              
-        """
-        
+
+
+    # get standart print of range
+    def getRange(self, nameList, startCol, startRow, endCol, endRow):
+        return str(nameList)+'!'+str(startCol)+str(startRow)+':'+str(endCol)+str(endRow)
+    
+    
+    def _getColNameFromColInt(self, col):
+        row=''
+        while (col>0):
+            row=chr(ord('A')+int(col%self._len_English_Sub))+row
+            col=math.floor(col/self._len_English_Sub)
+        return row
+      
+       
+    def _convertToSendAtendance(self, rowAtendanse):
+        colAtendanse=[]
+        for atendance in rowAtendanse:
+            if (atendance==0):
+                colAtendanse.append([''])   
+            else:
+                colAtendanse.append([atendance])                
+        return colAtendanse
+    
+    
+    def _updateAttendanseSheet(self, nameList, col, startRow, endRow, atendanse):
+        print(col)
+        atendanse=self._convertToSendAtendance(atendanse)
+        col=self._getColNameFromColInt(col)
+        print(atendanse)
+        print(self.getRange(nameList, col, startRow, col, endRow))
+        data = [{
+            'range': self.getRange(nameList, col, startRow, col, endRow),
+            'values': atendanse
+        }]
+        body = {
+            'valueInputOption': 'RAW', # USER_ENTERED
+            'data': data
+        }
+        result = self.__spreadsheet.values().batchUpdate(spreadsheetId=googleSheetSettings.google_spreadsheet_id, body=body).execute()
+        print('{0} cells updated.'.format(result.get('totalUpdatedCells')))
+
         
        
-    def setAllAtendancesInfo(self, sheet, colPositionDate, attandance):
-        """
-        Get all necessary info by googleSheetSettings, static params and date.
-        
-        !Attention: if we dont have any information, than returns: [] for all param
-        
-        :param date: non convert attandance for ALL sheets
-        :param FIOs: FIO arrays for ALL sheets 
-        :returns:   sheets - names of all sheets (equal groups)
-                    FIOs - array of array FIO for every group
-                    colPositionDates - array of horizontal position of the date and Atendances
-                    atendances - array of array atendances for avery group              
-        """       
+    def setAllAtendancesSheet(self, sheets, colPositionDate, atendances):
+        for index in range(len(sheets)):
+            self._updateAttendanseSheet(sheets[index], 
+                colPositionDate[index], 
+                self._row_start_date_atendance+self._shift_rows+1, 
+                self._row_start_date_atendance+self._shift_rows+len(atendances[index]), 
+                atendances[index])
+              
         
 
 # Body Of some external Function
@@ -355,15 +388,17 @@ except:
 
 groups=[]
 FIOs=[]
-startAtendance=[]
+startAtendances=[]
 atendances=[]
 
 #try:
-groups, FIOs, startAtendance, atendances =  googleTable.getAllAtendanceInfoByDate('09.04')
+groups, FIOs, startAtendances, atendances =  googleTable.getAllAtendanceInfoByDate('09.04')
 #except Exception:
 #    print('Something wrong with the connection to GoogleSheet or some mistake...')
     
 print(groups)
 print(FIOs)
-print(startAtendance)
+print(startAtendances)
 print(atendances)
+
+googleTable.setAllAtendancesSheet(groups, startAtendances, atendances)
