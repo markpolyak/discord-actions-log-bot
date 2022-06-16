@@ -24,6 +24,11 @@ NOT_EXIST_SIMILAR=False
 # Или человек с именем Надыргулов Иль9  написал в Шутку: Надыргулов Иль9 а потом написал 433, а существуют группы 9433 и 433
 notExistSimilar=NOT_EXIST_SIMILAR
 
+
+# Предупреждения и ошибки
+resultErrors=[]
+resultWarnings=[]
+
 # класс перечислений вариантов алгоритма
 class variantsOfAlgoritm(enum.Enum):
         withSpace = 1 # приводим к пробелам
@@ -47,7 +52,7 @@ class successState(enum.Enum):
 class warningState(enum.Enum):
     CompareButNotEqual = 1 # мало информации, но уникален - Петров А или Петров, Петров А В, или Петров Андр
     # корректный вариант - Петров Андрей, Петров Андрей Владимирович
-    AlreadySetAttendance = 2 # уже стоит не 0 в google - таблице
+    AlreadySetAttendance = 2 # уже стоит не 0 в google sheet
 
 # State of error result  
 class errorState(enum.Enum):
@@ -91,6 +96,8 @@ def getErrorOrWarning(enumValue, nick, info=[]):
         return "Error: '" + nick + "' not unique in google sheet - in group " + getStringForErrorsAndWarnings(info)       
     elif (enumValue == warningState.CompareButNotEqual):
         return "Warning: nick '" + nick + "' is short, but we find an unique - in group " + getStringForErrorsAndWarnings(info)
+    elif (enumValue == warningState.AlreadySetAttendance):
+        return "Warning: for nick '" + nick + "' was already set attendance - in group " + getStringForErrorsAndWarnings(info)
     else:
         return ''
   
@@ -514,7 +521,19 @@ def changeIndexOfFIOsResultToFIOs(groups, result, googleSheetInfoArray):
         FIOs[indexFIO]=googleSheetInfoArray[groups.index(group)].getArrayOfPartsFIOByIndex(FIOs[indexFIO])
     result[1]=FIOs
     return result
+
     
+    
+# from ['group', [fio, fio]] set attendance to googleSheetInfoArray
+def setAttendanceByResult(groups, results, googleSheetInfoArray):
+        group = results[0][0]
+        indexFIO=results[0][1][0]
+        if (googleSheetInfoArray[groups.index(group)].getAttendanceArrayByIndex(indexFIO)!=0):
+            return False
+        else:
+            googleSheetInfoArray[groups.index(group)].setAttendanceArrayByIndex(indexFIO)  
+            return True
+ 
 # TODO пока что возвращаем, но возможно лучше здесь же проставлять посещаемость, записывать ошибки и предупреждения
 # основная функция поиска ника серди всех групп и всех фамилий
 def findNickFromGroupAndFIO(groups, googleSheetInfoArray, nick):
@@ -545,46 +564,43 @@ def findNickFromGroupAndFIO(groups, googleSheetInfoArray, nick):
             isUniqueButNotEnough=True
             results.append([groups[indexGroup], indexFIOs])
             
-        if (result==errorState.NotExist):
+        if (result!=errorState.UnknownGroup):
             isExistGroup = True
    
     print('Results --------------')
     print(results)
    
     # если ровно одно совпадение
-    if (len(results)==1):
-        result = results[0]
-        group = result[0]
-        indexFIO=result[1][0]
-        # TODO проверка на отсутствие посещения, иначе - warning
-        
+    if (len(results)==1):      
         # проставляем посещаемость
-        googleSheetInfoArray[groups.index(group)].setAttendanceArrayByIndex(indexFIO)
+        # если посещаемость уже была проставлена
+        if (setAttendanceByResult(groups, results, googleSheetInfoArray) == False):
+            results=changeIndexOfFIOsResultToFIOs(groups, results[0], googleSheetInfoArray)
+            resultWarnings.append(getErrorOrWarning(warningState.AlreadySetAttendance, nick, results))  
+        else:
+            # преобразум все индексы ФИО в ФИО
+            results=changeIndexOfFIOsResultToFIOs(groups, results[0], googleSheetInfoArray)
         
         # случаи равенства
         if (isUniqueButNotEnough):
-            # преобразум все индексы ФИО в ФИО
-            results=changeIndexOfFIOsResultToFIOs(groups, results, googleSheetInfoArray)
-            print(results)
-            return  getErrorOrWarning(namePersonState.isUniqueButNotEnough, nick, results[0]), googleSheetInfoArray
-        else:
-            return '', googleSheetInfoArray
+            resultWarnings.append(namePersonState.isUniqueButNotEnough, nick, results)
+            
+        return
 
     for indexResult in range(len(results)):
-        results[indexResult]=changeIndexOfFIOsResultToFIOs(groups, results[indexResult], googleSheetInfoArray)    
-    print(results)    
+        results[indexResult]=changeIndexOfFIOsResultToFIOs(groups, results[indexResult], googleSheetInfoArray)      
     
     # если не найдено совпадений
     if (len(results)<=0):
         # если группа существует
         if (isExistGroup):
-            return getErrorOrWarning(errorState.NotExist, nick, results), googleSheetInfoArray
+            resultErrors.append(getErrorOrWarning(errorState.NotExist, nick, results))
         # если же не существует
         else:
-            return getErrorOrWarning(errorState.UnknownGroup, nick, results), googleSheetInfoArray
+            resultErrors.append(getErrorOrWarning(errorState.UnknownGroup, nick))
     # если найдено больше двух совпадений (поиск по двум группам)
     else:
-        return getErrorOrWarning(errorState.NotUniqueByGroup, nick, results), googleSheetInfoArray
+        resultErrors.append(getErrorOrWarning(errorState.NotUniqueByGroup, nick, results))
     
    
 # TODO Функция, которая проставляет посещемость для никнейма по заданной группе, никнейму и массиву частей ФИО
@@ -635,16 +651,13 @@ def parseGoogleSheet(date, groups):
 # функция, которая проставляет новую информацию по посещениям
 def setActualAttendance(groups, googleSheetInfoArray, nicks):
     # Предупреждения и ошибки
-    resultErrorsAndWarnings=[]
+    resultWarnings=[]
+    resultErrors=[]
     
     for indexNick in range(len(nicks)):
         # в качестве результата принимаем строку ошибки либо пустую строку, если все хороошо
-        result, googleSheetInfoArray= findNickFromGroupAndFIO(groups, googleSheetInfoArray, nicks[indexNick])
-        print(result)
-        if (result!=''):
-            resultErrorsAndWarnings.append(result)
-   
-    return resultErrorsAndWarnings, googleSheetInfoArray
+        findNickFromGroupAndFIO(groups, googleSheetInfoArray, nicks[indexNick])
+    return resultWarnings, resultErrors
         
 
 # функция, которая проставляет новую посещаемость в гугл таблице
@@ -676,12 +689,21 @@ def getAndSetGoogleSheet(date, nicks):
     
     
 #Good -----------
+#groups=['в4933', '4933']
+
+#googleSheetInfoArray=[]
+#googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Семенов', 'Павел', 'Александрович']], [0, 0]))
+
+#googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 0]))
+#nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игор4933']
+
+#AlreadySetAttendance -----------
 groups=['в4933', '4933']
 
 googleSheetInfoArray=[]
-googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Семенов', 'Павел', 'Александрович']], [0, 0]))
+googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Семенов', 'Павел', 'Александрович']], [1, 0]))
 
-googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 0]))
+googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 1]))
 nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игор4933']
 
 #Not unique by qroups -----------
@@ -730,8 +752,9 @@ nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', '�
 #nicks=['dfв@49#3$3№петровАндрейВладимирович', 'игор4933']
 #nicks=['Петров Андрей в4933', 'игор4933']
 # проставляем посещаемость по никнеймам
-resultErrorsAndWarnings, googleSheetInfoArray=setActualAttendance(groups, googleSheetInfoArray, nicks)
+setActualAttendance(groups, googleSheetInfoArray, nicks)
 
-print(resultErrorsAndWarnings)
+print(resultWarnings)
+print(resultErrors)
 print(googleSheetInfoArray[0].getAttendanceArray())
 print(googleSheetInfoArray[1].getAttendanceArray())
