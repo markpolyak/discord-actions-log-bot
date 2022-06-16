@@ -35,6 +35,8 @@ class GoogleSheet:
     # our Sheets
     __spreadsheet = None
     
+    
+    
 
     def __init__(self):
         """
@@ -281,7 +283,7 @@ class GoogleSheet:
         return lenArray
 
     
-    def getAllAtendanceInfoByDate(self, date):
+    def getGoogleSheetInfoByDate(self, date):
         """
         Get all necessary info by googleSheetSettings, static params and date.
         
@@ -307,7 +309,7 @@ class GoogleSheet:
         
         # get horizontal position of date for attandance for all sheets
         colPositionDates = self._get_all_col_dates(date, datesAtendance, startAtendance, sheets)
-        print(colPositionDates)
+        
         # Convert to actual info
         sheets = self._dropInfoWthoutDate(sheets, colPositionDates)
         colPositionDates = self._dropInfoWthoutDate(colPositionDates, colPositionDates)  
@@ -323,7 +325,7 @@ class GoogleSheet:
         # get convert atendances for every sheet        
         atendances = self._convert_atendances_to_standart(atendances, lenArray)
         
-        return (sheets, FIOs, colPositionDates, atendances)
+        return (sheets, colPositionDates, FIOs, atendances)
 
 
 
@@ -432,30 +434,3 @@ class GoogleSheet:
                 # we can check this, where we get info - but in main fuction we couldn't find man with empty group (it can help to teacher)
                 sendErrors.append['For group ' + sheets[index] + ' length of atendance equal zero']      
             return isSendSomething, sendErrors
-
-
-# Body Of some external Function
-googleTable=None
-try:
-    googleTable = GoogleSheet()
-except:
-    print('Something wrong with the connection to GoogleSheet...')
-
-groups=[]
-FIOs=[]
-startAtendances=[]
-atendances=[]
-
-#try:
-groups, FIOs, startAtendances, atendances =  googleTable.getAllAtendanceInfoByDate('09.04')
-#except Exception:
-#    print('Something wrong with the connection to GoogleSheet or some mistake...')
-    
-print(groups)
-print(FIOs)
-print(startAtendances)
-print(atendances)
-
-isSendSomething, sendErrors = googleTable.setAllAtendancesSheet(groups, startAtendances, atendances)
-print(isSendSomething)
-print(sendErrors)
