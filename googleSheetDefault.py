@@ -11,13 +11,13 @@ from google.auth.transport.requests import Request
 class GoogleSheet:
     # If modifying these scopes, delete the file token.pickle.
     # We need write access to the __spreadsheet: https://developers.google.com/sheets/api/guides/authorizing
-    SCOPES = ['https://www.googleapis.com/auth/__spreadsheets']
+    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-    # row, where start name attendance
-    _row_start_name_attendance=0
+    # row, where start name atendance
+    _row_start_name_atendance=0
 
     # row, where start date
-    _row_start_date_attendance=1
+    _row_start_date_atendance=1
 
     # col where start FIOs
     _col_start_FIOs=1
@@ -46,7 +46,7 @@ class GoogleSheet:
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    googleSheetSettings.google_credentials_file, SCOPES)
+                    googleSheetSettings.google_credentials_file, self.SCOPES)
                 creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
             with open(googleSheetSettings.google_token_pickle, 'wb') as token:
@@ -90,48 +90,52 @@ class GoogleSheet:
       
 
       
-    def _find_dates_and_ranges_attendance(self, sheets, multiple_sheets_data):
+    def _find_dates_and_ranges_atendance(self, sheets, multiple_sheets_data):
         """
         Get range array of start and end position lectures for every sheet
         Get array of dates lectures for every sheet
         
         :param sheets: a list of sheet names for which the data is to be retrieved
         :param multiple_sheets_data: a list of data for every sheet in sheets
+        :returns:   startatendance - array of horizontal position, where dates start
+                    datesatendance - array of arrays of all dates in every sheet
+        
         """
-        startattendance=[]
-        datesattendance=[]
+        startatendance=[]
+        datesatendance=[]
         for indexSheet in range(len(sheets)):
 
-            datesattendance.append([])
+            datesatendance.append([])
             sheetData=multiple_sheets_data[sheets[indexSheet]]
             
-            # flag of attendance
-            isattendance=False
+            # flag of atendance
+            isatendance=False
             for indexCol in range(len(sheetData)):
                 # if not enough rows
-                if (len(sheetData[indexCol])-1<self._row_start_date_attendance):
+                if (len(sheetData[indexCol])-1<self._row_start_date_atendance):
                     continue
                     
-                if (isattendance):
-                    if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self._row_start_date_attendance])!=None): 
+                if (isatendance):
+                    if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self._row_start_date_atendance])!=None): 
                         # set exist date
-                        datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])
+                        datesatendance[indexSheet].append(sheetData[indexCol][self._row_start_date_atendance])
                     else:
                         break 
-                # if wind key-word - is start of attendance
-                elif (sheetData[indexCol][self._row_start_name_attendance]==googleSheetSettings.name_of_attendance):
-                    startattendance.append(indexCol)
-                    isattendance=True
+                # if wind key-word - is start of atendance
+                elif (sheetData[indexCol][self._row_start_name_atendance]==googleSheetSettings.name_of_atendance):
+                    startatendance.append(indexCol)
+                    isatendance=True
                     # set exist date
-                    datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])             
-        return (startattendance, datesattendance)
+                    datesatendance[indexSheet].append(sheetData[indexCol][self._row_start_date_atendance])             
+        return (startatendance, datesatendance)
     
     def _find_FIOs(self, sheets, multiple_sheets_data):
         """
-        Get array of FIO students for every sheet
+        Parse multiple_sheets_data and get array of FIO students for every sheet
         
         :param sheets: a list of sheet names for which the data is to be retrieved
         :param multiple_sheets_data: a list of data for every sheet in sheets
+        :returns: array of FIO for every sheet
         """
  
         sheetsFIOs=[]
@@ -149,11 +153,12 @@ class GoogleSheet:
         """
         Get col date position in googleSheet
         
+        !Attention date format dd.mm
+        
         :param date: the date of lecture
         :param dates: all dates, which we have for current sheet
         :param startDate: index col, where start the dates    
-        :param sheets: a list of sheet names for which the data is to be retrieved
-        :param multiple_sheets_data: a list of data for every sheet in sheets
+        :returns: in dates horizontal position of date
         """
         
         try:
@@ -170,116 +175,176 @@ class GoogleSheet:
         :param dates: all dates, which we have for current sheet
         :param startDate: index col, where start the dates    
         :param sheets: a list of sheet names for which the data is to be retrieved
+        :returns: in dates horizontal position of all dates
         """
 
-        colDates = []
+        colPositionDates = []
         
         for indexSheet in range(len(sheets)):
             colDate=self._get_col_date(date, dates[indexSheet], startDates[indexSheet])
                         # if date not exist for group
 
-            colDates.append(colDate)
-        return colDates
+            colPositionDates.append(colDate)
+        return colPositionDates
 
-    def _get_attendances(self, colDates, sheets, multiple_sheets_data):
+    def _get_atendances(self, colPositionDates, sheets, multiple_sheets_data):
         """
-        Get array of attendance for All date and sheet
+        Get array of atendance for All date and sheet
         
-        :param colDates: col date position in googleSheet for all sheets
+        :param colPositionDates: col date position in googleSheet for all sheets
         :param sheets: a list of sheet names for which the data is to be retrieved
         :param multiple_sheets_data: a list of data for every sheet in sheets
+        :returns: array of atendance for all sheets, which we have
         """
-
         
-        attendances=[]
+        atendances=[]
         for indexSheet in range(len(sheets)):
+            # get sheet Data by name Sheet
             sheetData=multiple_sheets_data[sheets[indexSheet]]
             
-            # if date not exist for group
-            if (colDates[indexSheet]<0):
-               attendances.append([]) 
-               continue
-
-            attendanceSheet=sheetData[colDates[indexSheet]]
-            # delete upper rows
-            for index in range(0, self._row_start_date_attendance+1):
-                if (len(attendanceSheet)<=0):
+            # get col with attandance Data
+            atendanceSheet=sheetData[colPositionDates[indexSheet]]
+            # delete upper rows, which dont have info about attandance
+            for index in range(0, self._row_start_date_atendance+1):
+                if (len(atendanceSheet)<=0):
                     break;
-                del attendanceSheet[0]
+                del atendanceSheet[0]
             
-            attendances.append(attendanceSheet)
+            # delete not used info in bottom isn't necessary - check fucntion - _convert_atendances_to_standart  
+                
+            # save attandance without upper rows
+            atendances.append(atendanceSheet)
+
+        return atendances
         
-        return attendances
-        
-    def _convert_attendances_to_standart(self, attendances, FIOs):
+    def _convert_atendances_to_standart(self, atendances, lenArray):
         """
-        Convert attendances to similar size with FIO
+        Convert atendances to similar size with equal by index element in lenArray
         
-        :param attendances: non convert attandance for ALL sheets
-        :param FIOs: FIO arrays for ALL sheets 
+        :param atendances: non convert attandance for ALL sheets
+        :param lenArray: FIO arrays for ALL sheets 
+        :returns: array of attandance, converted to length of lenArray
         """
-        convertAttendances=[]
-        for indexSheet in range(len(FIOs)):
-            
-            # if date doesn't exist - attendance doesn't exists
-            if (attendances[indexSheet]==[]):
-                convertAttendances.append([])
-                continue
-        
-            convertAttendanceSheet = [0]*len(FIOs[indexSheet])
-            for index in range(len(attendances[indexSheet])):
-                if (index>=len(FIOs[indexSheet])):
+        convertAtendances=[]
+
+        for indexSheet in range(len(lenArray)):        
+            convertAtendanceSheet = [0]*lenArray[indexSheet]
+            for index in range(len(atendances[indexSheet])):
+                if (index>=lenArray[indexSheet]):
                     break
                 # set value only for 1
-                if (attendances[indexSheet][index]=='1'):
-                    convertAttendanceSheet[index]=1
+                if (atendances[indexSheet][index]=='1'):
+                    convertAtendanceSheet[index]=1
             
-            convertAttendances.append(convertAttendanceSheet)   
+            convertAtendances.append(convertAtendanceSheet)   
         
-        return convertAttendances
+        return convertAtendances
     
-    def _dropInfoWthoutDate(self, infoArr, colDates):
+    def _dropInfoWthoutDate(self, infoArray, colPositionDates):
+        """
+        Delete all coloumns in infoArray where for current index not exist horizontal position of the date in colPositionDates
+        
+        :param infoArray: array of info, like arr of groups or array of arrays FIO or atendance
+        :param colPositionDates: array of horizontal position of the date - if not exist, than have value -1
+        :returns: array with remove cols from infoArray, which have by index in colPositionDates value -1
+        """
         actualInfo=[]
-        for indexSheet in range(len(colDates)):
-            if (colDates[indexSheet]>=0):
-                actualInfo.append(infoArr[indexSheet])
+        lenArray=len(infoArray)
+        for indexSheet in range(len(colPositionDates)):
+            if (colPositionDates[indexSheet]>=0):
+                if (indexSheet<lenArray):
+                    actualInfo.append(infoArray[indexSheet])
         return actualInfo
         
-    def getAllAttendanceInfoByDate(self, date):
+    def _getSizeOfArraysInArray(self, infoArray):
         """
-        Convert attendance to similar size with FIO
+        Find sizes for all arrays in infoArray
         
-        :param attendances: non convert attandance for ALL sheets
-        :param FIOs: FIO arrays for ALL sheets 
+        !Attention: Not correct result if not array (if string, int...)
+        
+        :param infoArray: array of info, like arr of groups or array of arrays FIO or atendance
+        :returns: array of sizes elements (arrays) in infoArray 
+        """   
+    
+        lenArray=[]
+        for array in infoArray:
+            lenArray.append(len(array))
+        return lenArray
+        
+    def getAllAtendanceInfoByDate(self, date):
         """
-
+        Get all necessary info by googleSheetSettings, static params and date.
+        
+        !Attention: if we dont have any information, than returns: [] for all param
+        
+        :param date: non convert attandance for ALL sheets
+        :param FIOs: FIO arrays for ALL sheets 
+        :returns:   sheets - names of all sheets (equal groups)
+                    FIOs - array of array FIO for every group
+                    colPositionDates - array of horizontal position of the date and Atendances
+                    atendances - array of array atendances for avery group              
+        """
+        
         # get all sheets
+        # sheets are equal groups
         sheets=self._get_sheet_names()
 
         # get all info in every sheet
         result = self._get_multiple_sheets_data(sheets)
         
-        # get start position of dates and attendance, and also dates
-        startAttendance, datesAttendance = self._find_dates_and_ranges_attendance(sheets, result)
+        # get start position of dates and atendance, and also dates
+        startAtendance, datesAtendance = self._find_dates_and_ranges_atendance(sheets, result)
+        
+        # get horizontal position of date for attandance for all sheets
+        colPositionDates = self._get_all_col_dates(date, datesAtendance, startAtendance, sheets)
+        print(colPositionDates)
+        # Convert to actual info
+        sheets = self._dropInfoWthoutDate(sheets, colPositionDates)
+        colPositionDates = self._dropInfoWthoutDate(colPositionDates, colPositionDates)  
         
         # get FIOs for every sheet
         FIOs = self._find_FIOs(sheets, result)
-        
-        colDates = self._get_all_col_dates(date, datesAttendance, startAttendance, sheets)
 
-        # Convert to actual info:
-        sheets = self._dropInfoWthoutDate(sheets, colDates)
-        FIOs = self._dropInfoWthoutDate(FIOs, colDates)     
-        colDates = self._dropInfoWthoutDate(colDates, colDates)  
+        lenArray = self._getSizeOfArraysInArray(FIOs)
 
         # get attandances for every sheet
-        attendances=self._get_attendances(colDates, sheets, result)
+        atendances = self._get_atendances(colPositionDates, sheets, result)
         
-        # get convert attandances for every sheet        
-        attendances=self._convert_attendances_to_standart(attendances, FIOs)
+        # get convert atendances for every sheet        
+        atendances = self._convert_atendances_to_standart(atendances, lenArray)
 
-        return (sheets, FIOs, colDates, attendances)
+        return (sheets, FIOs, colPositionDates, atendances)
 
+    def _setAtendanceInfoForSheet(self, sheet, colPositionDate, attandance):
+        """
+        Get all necessary info by googleSheetSettings, static params and date.
+        
+        !Attention: if we dont have any information, than returns: [] for all param
+        
+        :param date: non convert attandance for ALL sheets
+        :param FIOs: FIO arrays for ALL sheets 
+        :returns:   sheets - names of all sheets (equal groups)
+                    FIOs - array of array FIO for every group
+                    colPositionDates - array of horizontal position of the date and Atendances
+                    atendances - array of array atendances for avery group              
+        """
+        
+        
+       
+    def setAllAtendancesInfo(self, sheet, colPositionDate, attandance):
+        """
+        Get all necessary info by googleSheetSettings, static params and date.
+        
+        !Attention: if we dont have any information, than returns: [] for all param
+        
+        :param date: non convert attandance for ALL sheets
+        :param FIOs: FIO arrays for ALL sheets 
+        :returns:   sheets - names of all sheets (equal groups)
+                    FIOs - array of array FIO for every group
+                    colPositionDates - array of horizontal position of the date and Atendances
+                    atendances - array of array atendances for avery group              
+        """       
+        
 
 # Body Of some external Function
 googleTable=None
@@ -290,15 +355,15 @@ except:
 
 groups=[]
 FIOs=[]
-startAttendance=[]
-attendances=[]
+startAtendance=[]
+atendances=[]
 
 #try:
-groups, FIOs, startAttendance, attendances =  googleTable.getAllAttendanceInfoByDate('09.04')
+groups, FIOs, startAtendance, atendances =  googleTable.getAllAtendanceInfoByDate('09.04')
 #except Exception:
 #    print('Something wrong with the connection to GoogleSheet or some mistake...')
     
 print(groups)
 print(FIOs)
-print(startAttendance)
-print(attendances)
+print(startAtendance)
+print(atendances)
