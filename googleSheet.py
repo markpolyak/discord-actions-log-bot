@@ -65,6 +65,7 @@ class GoogleSheetInfo:
         if index in range(len(self.__atendanceArray)):
             self.__atendanceArray[index] = atendanceArrayElement
  
+
 # special variants, which is not similar in lower in upper  
 exceptionsFromEngToRus=['t', 'b','r']
 
@@ -103,665 +104,657 @@ class errorState(enum.Enum):
     NotUnique = 4 # не уникален в группе
     NotUniqueByGroup = 2 # при парсинге нашлось несколько групп, в которые можно проставить посещаемость
 
-# Предупреждения
-resultErrors=[]
-# Ошибки
-resultWarnings=[]
 
-googleSheetInfoArray=[]
+class GoogleSheetParser:
 
-dictResult={
-    'alreadyUpdated' : 0,
-    'updated' : 0,
-    'notUpdated' : 0,
-    'errors' : 0,
-    'warnings' : 0,
-}
+    # Предупреждения
+    __resultErrors=[]
+    # Ошибки
+    __resultWarnings=[]
+
+    __googleSheetInfoArray=[]
+
+    __dictResult={
+        'alreadyUpdated' : 0,
+        'updated' : 0,
+        'notUpdated' : 0,
+        'errors' : 0,
+        'warnings' : 0,
+    }
 
 
-# очистка результата
-def clearDictResult():
-    global dictResult
-    for result in dictResult:
-        dictResult[result] = 0
-
-# инкрементация результата
-def incDictResult(result):
-    global dictResult
-    if (result in [successState.SuccessfulCompare, warningState.CompareButNotEqual]):
-        print('0')
-        dictResult['updated']+=1
-    elif (result == warningState.AlreadySetAtendance):
-
-        dictResult['alreadyUpdated']+=1
-    else:
-        dictResult['notUpdated']+=1
-
+    def __init__(self):
+        self.__resultErrors = [] # example: '4933'
+        self.__resultWarnings=[] # position in google Sheet - example: [A, 0] or [0, 0]
+        self.__googleSheetInfoArray=[]
+        self._clearDictResult()
         
-    if result in warningState:
-         dictResult['warnings']+=1
-    elif result in errorState:
-         dictResult['errors']+=1
 
-# перобразовать результат словаря в сообщение
-def dictResultToMessage():
-    return "Total already updated: " + str(dictResult['alreadyUpdated']) + '\n' + \
-        "Total updated: " + str(dictResult['updated']) +'\n' + \
-        "Total not updated: " + str(dictResult['notUpdated']) +'\n' + \
-        "Total errors: " + str(dictResult['errors']) +'\n' + \
-        "Total warnings: " + str(dictResult['warnings']) +'\n'
+    # очистка результата
+    def _clearDictResult(self):
+        for result in self.__dictResult:
+            self.__dictResult[result] = 0
+
+    # инкрементация результата
+    def _incDictResult(self, result):
+        if (result in [successState.SuccessfulCompare, warningState.CompareButNotEqual]):
+            print('0')
+            self.__dictResult['updated']+=1
+        elif (result == warningState.AlreadySetAtendance):
+
+            self.__dictResult['alreadyUpdated']+=1
+        else:
+            self.__dictResult['notUpdated']+=1
+
+            
+        if result in warningState:
+             self.__dictResult['warnings']+=1
+        elif result in errorState:
+             self.__dictResult['errors']+=1
+
+    # перобразовать результат словаря в сообщение
+    def __dictResultToMessage(self):
+        return "Total already updated: " + str(self.__dictResult['alreadyUpdated']) + '\n' + \
+            "Total updated: " + str(self.__dictResult['updated']) +'\n' + \
+            "Total not updated: " + str(self.__dictResult['notUpdated']) +'\n' + \
+            "Total errors: " + str(self.__dictResult['errors']) +'\n' + \
+            "Total warnings: " + str(self.__dictResult['warnings']) +'\n'
 
 
-# преобразует массив вида [group, [arrfio, arrfio]] в строку вида "'group': 'f i o' 'f i o'; "
-def getStringForErrorsAndWarnings(info):
-    groupFIO=info[0]
-    FIOs=info[1]
-    # set group
-    result = "'" + info[0]+ "'" + ": "
-    # для каждого arrfio
-    for index in range(len(FIOs)):
-        if (index!=0):
-            result+=' '
-        result+="'"+' '.join(FIOs[index])+"'"
-    result+=';'
-    return result
-
-# Получить предупреждение или ошибку        
-def getErrorOrWarning(enumValue, nick, info=[]):
-    nick=str(nick)
-# info =[[group, [arrfio, arrfio]]...] - NotUniqueByGroup
-# info =[group, [arrfio, arrfio]] - errorState.NotUnique
-# info =[group, [arrfio]] - warningState.CompareButNotEqual
-    if (enumValue == errorState.UnknownGroup):
-        return "Error: '" + nick + "' have wrong group or group doesn't exists in google sheet"
-    elif (enumValue ==  enumValue == errorState.NotUniqueByGroup):
-        result = "Error: '" + nick + "' have more than one coincidence in different groups - "
-        for indexGroupFIO in range(len(info)):
-            result+= " in group " +  getStringForErrorsAndWarnings(info[indexGroupFIO])
+    # преобразует массив вида [group, [arrfio, arrfio]] в строку вида "'group': 'f i o' 'f i o'; "
+    def _getStringForErrorsAndWarnings(self, info):
+        groupFIO=info[0]
+        FIOs=info[1]
+        # set group
+        result = "'" + info[0]+ "'" + ": "
+        # для каждого arrfio
+        for index in range(len(FIOs)):
+            if (index!=0):
+                result+=' '
+            result+="'"+' '.join(FIOs[index])+"'"
+        result+=';'
         return result
-    elif (enumValue == errorState.NotExist):
-        return "Error: '" + nick + "' not Exist in google sheet;"
-    elif (enumValue == errorState.NotUnique):
-        return "Error: '" + nick + "' not unique in google sheet - in group " + getStringForErrorsAndWarnings(info)       
-    elif (enumValue == warningState.CompareButNotEqual):
-        return "Warning: nick '" + nick + "' is short, but we find an unique - in group " + getStringForErrorsAndWarnings(info)
-    elif (enumValue == warningState.AlreadySetAtendance):
-        return "Warning: for nick '" + nick + "' atendance has been already set - in group " + getStringForErrorsAndWarnings(info)
-    else:
-        return ''
+
+    # Получить предупреждение или ошибку        
+    def _getErrorOrWarning(self, enumValue, nick, info=[]):
+        nick=str(nick)
+    # info =[[group, [arrfio, arrfio]]...] - NotUniqueByGroup
+    # info =[group, [arrfio, arrfio]] - errorState.NotUnique
+    # info =[group, [arrfio]] - warningState.CompareButNotEqual
+        if (enumValue == errorState.UnknownGroup):
+            return "Error: '" + nick + "' have wrong group or group doesn't exists in google sheet"
+        elif (enumValue ==  enumValue == errorState.NotUniqueByGroup):
+            result = "Error: '" + nick + "' have more than one coincidence in different groups - "
+            for indexGroupFIO in range(len(info)):
+                result+= " in group " +  self._getStringForErrorsAndWarnings(info[indexGroupFIO])
+            return result
+        elif (enumValue == errorState.NotExist):
+            return "Error: '" + nick + "' not Exist in google sheet;"
+        elif (enumValue == errorState.NotUnique):
+            return "Error: '" + nick + "' not unique in google sheet - in group " + self._getStringForErrorsAndWarnings(info)       
+        elif (enumValue == warningState.CompareButNotEqual):
+            return "Warning: nick '" + nick + "' is short, but we find an unique - in group " + self._getStringForErrorsAndWarnings(info)
+        elif (enumValue == warningState.AlreadySetAtendance):
+            return "Warning: for nick '" + nick + "' atendance has been already set - in group " + self._getStringForErrorsAndWarnings(info)
+        else:
+            return ''
 
 
-# привести к пробелам знаки
-def turnToSpacesSigns(stroka):
-    return re.sub(r'[^a-zA-Zа-яА-Я]', " ",  stroka)
-    
-# удаляем все, кроме букв, чисел
-def delSigns(stroka):
-    return re.sub(r'[^a-zA-Zа-яА-Я0-9]', "",  stroka)
+    # привести к пробелам знаки
+    def _turnToSpacesSigns(self, stroka):
+        return re.sub(r'[^a-zA-Zа-яА-Я]', " ",  stroka)
+        
+    # удаляем все, кроме букв, чисел
+    def _delSigns(self, stroka):
+        return re.sub(r'[^a-zA-Zа-яА-Я0-9]', "",  stroka)
 
 
-# заменяем все на русские буквы и пробелы
-# Петров А.В. -> ПетровАВ
-def turnToSpacesAllWthoutName(stroka):
-    return re.sub(r'[^а-яА-Я\s]', " ",  stroka)
+    # заменяем все на русские буквы и пробелы
+    # Петров А.В. -> ПетровАВ
+    def _turnToSpacesAllWthoutName(self, stroka):
+        return re.sub(r'[^а-яА-Я\s]', " ",  stroka)
 
-# оставляем только буквы русского алфавита
-def delAllWthoutName(stroka):
-    return re.sub(r'[^а-яА-Я]', "",  stroka)    
+    # оставляем только буквы русского алфавита
+    def _delAllWthoutName(self, stroka):
+        return re.sub(r'[^а-яА-Я]', "",  stroka)    
 
-# получить индекс первого числа в строке
-def getIndexFirstDigit(stroka, startPosition = 0):
-    # если начальная позиция находится за границами
-    if (startPosition>=len(stroka) or startPosition<0):
+    # получить индекс первого числа в строке
+    def _getIndexFirstDigit(self, stroka, startPosition = 0):
+        # если начальная позиция находится за границами
+        if (startPosition>=len(stroka) or startPosition<0):
+            return -1
+        for index in range(startPosition, len(stroka)):
+            if (stroka[index].isdigit()):
+                return index
+        # иначе нет нет чисел - возвращаем -1
         return -1
-    for index in range(startPosition, len(stroka)):
-        if (stroka[index].isdigit()):
-            return index
-    # иначе нет нет чисел - возвращаем -1
-    return -1
 
 
 
-# приводим к нижнему регистру и к английскому алфавиту подобные
-def toGroupStandartSymb(symbGroup):
-    if symbGroup in exceptionsFromEngToRus:
-       return symbGroup.upper()
-    
-    # to Up register   
-    symbGroup = symbGroup.upper()
-    if symbGroup in fromEngToRusDefault:
-        return fromEngToRusDefault[symbGroup]
-    else:
-        return symbGroup
-    
-# сравниваем формат символов и их значения - для всех символов группы
-def compareFormatSymb(group, groupNick):
-    # если размеры не равны
-    if (len(group)!=len(groupNick)):
-        return False
+    # приводим к нижнему регистру и к английскому алфавиту подобные
+    def _toGroupStandartSymb(self, symbGroup):
+        if symbGroup in exceptionsFromEngToRus:
+           return symbGroup.upper()
         
-    # для каждого элемента производим проверку
-    for index in range(len(group)):
-        if (group[index].isdigit()):
-            if (group[index]!=groupNick[index]):
-                return False
+        # to Up register   
+        symbGroup = symbGroup.upper()
+        if symbGroup in fromEngToRusDefault:
+            return fromEngToRusDefault[symbGroup]
         else:
-            # здесь нужна более жестка функция проверки
-            if (toGroupStandartSymb(group[index])!=toGroupStandartSymb(groupNick[index])):
-                return False
-    # если дошли до сюда, то они равны по признаку значений
-    return True
-    
-    
-    
-# все символы начала приводим к верхнему регистру (т.е. после пробелов)
-# позволяет решить проблему петров андрейВладимирович-> Петров АндрейВладимирович, а далее парсинг по большим буквам
-def beginOfWordToUpRegister(stroka, toLower=False):
-    # убираем крайние пробелы
-    stroka=stroka.strip()
-    if (len(stroka)<1):
-        return ''
-    parseStroka=''
-    isSpace = True
-    for index in range(len(stroka)):
-        # если пробел
-        if (stroka[index]==' '):
-            isSpace=True
-            parseStroka+=stroka[index]
-        # если есть тригер на увлеичение
-        elif (isSpace==True):
-                parseStroka+=stroka[index].upper()
-                isSpace=False
-        elif (toLower==True):
-            parseStroka+=stroka[index].lower()
-        else:
-            parseStroka+=stroka[index]
-    # возвращаем результат парсинга
-    return parseStroka
-
-    
-# получаем составные части    
-def parseNameToParts(stroka):
-    # убираем все символы, кроме ФИО (пробелы также удаляются)
-    stroka=delAllWthoutName(stroka)
-    # парсим и получаем части ФИО
-    parseArr=[stroka[0].upper()]
-    currentName=0
-    for index in range(1, len(stroka)):
-        # если в верхнем регистре
-        if (stroka[index].upper()==stroka[index]):
-            #добавляем в конец
-            parseArr.append(stroka[index])
-            # текущий индекс - следующий
-            currentName+=1
-        else:
-            #добавляем в конец текущего - нет смысла в lower
-            parseArr[currentName]+=stroka[index]
-    return parseArr
-    
-# получить массив нумерации массива по индексам без пробелов относительно начального     
-def getIndicesNickWithoutSignes(nick):
-    resultArr=[]
-    for index in range(len(nick)):
-        if (delSigns(nick[index])!=''):
-            resultArr.append(index)
-    return resultArr
-    
+            return symbGroup
         
-    
-# получить группу из имени          
-# на вход - получаем стандартную группу, nick и nick без спец. символов, массив соответствия индексов последних двух
-def getNickWthoutGroupFromNick(group, nick, parseNick, indices):  
-    # получаем индекс начала для группы - группа обязательно должна содержать числа, иначе может возникнуть очень много неточностей парсинга
-    startDigitGroup=getIndexFirstDigit(group)
-    if (startDigitGroup<0):
-        return errorState.UnknownGroup
-    
-    # для никнейма получаем индекс начала числа
-    startDigitNick=getIndexFirstDigit(parseNick)
-    
-    # пока не конец
-    while (startDigitNick>=0 and startDigitNick<len(parseNick)):
-        # левая граница группы в нике
-        leftBorder=startDigitNick-startDigitGroup
-        # правая граница группы в нике
-        rightBorder=leftBorder+len(group)-1
-        
-        # если в никнейме не помещется искомая группа слева
-        if  (leftBorder<0 or
-                # если в никнейме не помещется искомая группа справа
-                rightBorder>=len(parseNick)):
-            # то пытаемся пойти дальше - сдвигаемся на величину до начала группы
-            startDigitNick=getIndexFirstDigit(parseNick, startDigitNick+startDigitGroup+1)
-        # если группа равна
-        else:
-            # извлекаем группу срезом строки для никнейма
-            parseGroup = parseNick[leftBorder:rightBorder+1]
-            # если группы равны
-            if (compareFormatSymb(group, parseGroup)):
-                # находим соответствие левой границы для стандартного ника
-                leftBorder=indices[leftBorder]
-                # находим соответствие правой границы для стандартного ника
-                rightBorder=indices[rightBorder]
-                # возвращаем срез никнейма без группы:
-                # срез не чувствителен к превышению лимита - возвращает пустоту
-                return nick[:leftBorder]+' '+ nick[rightBorder+1:]
+    # сравниваем формат символов и их значения - для всех символов группы
+    def _compareFormatSymb(self, group, groupNick):
+        # если размеры не равны
+        if (len(group)!=len(groupNick)):
+            return False
+            
+        # для каждого элемента производим проверку
+        for index in range(len(group)):
+            if (group[index].isdigit()):
+                if (group[index]!=groupNick[index]):
+                    return False
             else:
-                # иначе пытаемся пойти дальше - сдвигаемся на величину до начала группы
-                startDigitNick=getIndexFirstDigit(parseNick, startDigitNick+startDigitGroup+1)
-    
-    # если мы здесь, значит не нашли совпадение для группы
-    return errorState.UnknownGroup
+                # здесь нужна более жестка функция проверки
+                if (self._toGroupStandartSymb(group[index])!=self._toGroupStandartSymb(groupNick[index])):
+                    return False
+        # если дошли до сюда, то они равны по признаку значений
+        return True
+        
+        
+        
+    # все символы начала приводим к верхнему регистру (т.е. после пробелов)
+    # позволяет решить проблему петров андрейВладимирович-> Петров АндрейВладимирович, а далее парсинг по большим буквам
+    def _beginOfWordToUpRegister(self, stroka, toLower=False):
+        # убираем крайние пробелы
+        stroka=stroka.strip()
+        if (len(stroka)<1):
+            return ''
+        parseStroka=''
+        isSpace = True
+        for index in range(len(stroka)):
+            # если пробел
+            if (stroka[index]==' '):
+                isSpace=True
+                parseStroka+=stroka[index]
+            # если есть тригер на увлеичение
+            elif (isSpace==True):
+                    parseStroka+=stroka[index].upper()
+                    isSpace=False
+            elif (toLower==True):
+                parseStroka+=stroka[index].lower()
+            else:
+                parseStroka+=stroka[index]
+        # возвращаем результат парсинга
+        return parseStroka
 
-# получаем группу, которая соответствует и строку, которая записана в качестве группы в нике
-# [исходная группа, ник] or errorState.UnknownGroup
-def getGroupAndNickWthoutGroup(group, nick):
-    # получаем массив для случая удаления всех знаков nick
-    indices=getIndicesNickWithoutSignes(nick)
-    # получаем никнейм без спец. символов и пробелов
-    parseNick = delSigns(nick)
-    # пытаемся сопоставить группу с ником
-    nickWthoutGroup=getNickWthoutGroupFromNick(group, nick,  parseNick, indices)
-    # если группу получили (она равна искомой)
-    if (nickWthoutGroup!=errorState.UnknownGroup):
-        return [group, nickWthoutGroup]
-    # если мы не нашли группу
-    return errorState.UnknownGroup
+        
+    # получаем составные части    
+    def _parseNameToParts(self, stroka):
+        # убираем все символы, кроме ФИО (пробелы также удаляются)
+        stroka=self._delAllWthoutName(stroka)
+        # парсим и получаем части ФИО
+        parseArr=[stroka[0].upper()]
+        currentName=0
+        for index in range(1, len(stroka)):
+            # если в верхнем регистре
+            if (stroka[index].upper()==stroka[index]):
+                #добавляем в конец
+                parseArr.append(stroka[index])
+                # текущий индекс - следующий
+                currentName+=1
+            else:
+                #добавляем в конец текущего - нет смысла в lower
+                parseArr[currentName]+=stroka[index]
+        return parseArr
+        
+    # получить массив нумерации массива по индексам без пробелов относительно начального     
+    def _getIndicesNickWithoutSignes(self, nick):
+        resultArr=[]
+        for index in range(len(nick)):
+            if (self._delSigns(nick[index])!=''):
+                resultArr.append(index)
+        return resultArr
+        
+            
+        
+    # получить группу из имени          
+    # на вход - получаем стандартную группу, nick и nick без спец. символов, массив соответствия индексов последних двух
+    def _getNickWthoutGroupFromNick(self, group, nick, parseNick, indices):  
+        # получаем индекс начала для группы - группа обязательно должна содержать числа, иначе может возникнуть очень много неточностей парсинга
+        startDigitGroup=self._getIndexFirstDigit(group)
+        if (startDigitGroup<0):
+            return errorState.UnknownGroup
+        
+        # для никнейма получаем индекс начала числа
+        startDigitNick=self._getIndexFirstDigit(parseNick)
+        
+        # пока не конец
+        while (startDigitNick>=0 and startDigitNick<len(parseNick)):
+            # левая граница группы в нике
+            leftBorder=startDigitNick-startDigitGroup
+            # правая граница группы в нике
+            rightBorder=leftBorder+len(group)-1
+            
+            # если в никнейме не помещется искомая группа слева
+            if  (leftBorder<0 or
+                    # если в никнейме не помещется искомая группа справа
+                    rightBorder>=len(parseNick)):
+                # то пытаемся пойти дальше - сдвигаемся на величину до начала группы
+                startDigitNick=self._getIndexFirstDigit(parseNick, startDigitNick+startDigitGroup+1)
+            # если группа равна
+            else:
+                # извлекаем группу срезом строки для никнейма
+                parseGroup = parseNick[leftBorder:rightBorder+1]
+                # если группы равны
+                if (self._compareFormatSymb(group, parseGroup)):
+                    # находим соответствие левой границы для стандартного ника
+                    leftBorder=indices[leftBorder]
+                    # находим соответствие правой границы для стандартного ника
+                    rightBorder=indices[rightBorder]
+                    # возвращаем срез никнейма без группы:
+                    # срез не чувствителен к превышению лимита - возвращает пустоту
+                    return nick[:leftBorder]+' '+ nick[rightBorder+1:]
+                else:
+                    # иначе пытаемся пойти дальше - сдвигаемся на величину до начала группы
+                    startDigitNick=self._getIndexFirstDigit(parseNick, startDigitNick+startDigitGroup+1)
+        
+        # если мы здесь, значит не нашли совпадение для группы
+        return errorState.UnknownGroup
 
-# TO DO: можно также перед всеми действиями (но группа должна быть удалена) если начало дальше идет русская буква,
-#, то мы приводим её к верхнему регистру
+    # получаем группу, которая соответствует и строку, которая записана в качестве группы в нике
+    # [исходная группа, ник] or errorState.UnknownGroup
+    def _getGroupAndNickWthoutGroup(self, group, nick):
+        # получаем массив для случая удаления всех знаков nick
+        indices=self._getIndicesNickWithoutSignes(nick)
+        # получаем никнейм без спец. символов и пробелов
+        parseNick = self._delSigns(nick)
+        # пытаемся сопоставить группу с ником
+        nickWthoutGroup=self._getNickWthoutGroupFromNick(group, nick,  parseNick, indices)
+        # если группу получили (она равна искомой)
+        if (nickWthoutGroup!=errorState.UnknownGroup):
+            return [group, nickWthoutGroup]
+        # если мы не нашли группу
+        return errorState.UnknownGroup
+
+    # TO DO: можно также перед всеми действиями (но группа должна быть удалена) если начало дальше идет русская буква,
+    #, то мы приводим её к верхнему регистру
 
 
 
-# сопоставляем ФИО и полученные фрагменты никнейма
-# принимаем FIO и Nick в формате массивов
-def compareFIOandNick(FIOArr, nickArr, isEqual=False):
-    compareResult=[]
-    # создаем массив заполненный нулями - нальчальное значение эквиваленты сравнения
-    compareResult = [[0] * len(nickArr) for i in range(len(FIOArr))]
-    for indexFIO in range(len(FIOArr)):
-        for indexNick in range(len(nickArr)):
-            # равно ли FIO строке nick - сравнение в одинаковом регистре (необзательно приведение)
-            if (isEqual==True 
-                and nickArr[indexNick].lower() == FIOArr[indexFIO].lower()):
-                compareResult[indexFIO][indexNick]=1
-            # начинается ли FIO со строки nick - сравнение в одинаковом регистре (необзательно приведение)
-            elif (isEqual==False
-                 and re.match(nickArr[indexNick].lower(), FIOArr[indexFIO].lower())!=None):
-                compareResult[indexFIO][indexNick]=1
-    # проверяем - существует ли комбинация, при которой возможна идентичность        
-    return isExistFioCombination(compareResult)
- 
-# Случаи корректности Петр Петров, Петров А - недостаточно данных для однозначной идентификации (особые случаи)
-def isCorrectFIO():
-    return ''
-    
-    
+    # сопоставляем ФИО и полученные фрагменты никнейма
+    # принимаем FIO и Nick в формате массивов
+    def _compareFIOandNick(self, FIOArr, nickArr, isEqual=False):
+        compareResult=[]
+        # создаем массив заполненный нулями - нальчальное значение эквиваленты сравнения
+        compareResult = [[0] * len(nickArr) for i in range(len(FIOArr))]
+        for indexFIO in range(len(FIOArr)):
+            for indexNick in range(len(nickArr)):
+                # равно ли FIO строке nick - сравнение в одинаковом регистре (необзательно приведение)
+                if (isEqual==True 
+                    and nickArr[indexNick].lower() == FIOArr[indexFIO].lower()):
+                    compareResult[indexFIO][indexNick]=1
+                # начинается ли FIO со строки nick - сравнение в одинаковом регистре (необзательно приведение)
+                elif (isEqual==False
+                     and re.match(nickArr[indexNick].lower(), FIOArr[indexFIO].lower())!=None):
+                    compareResult[indexFIO][indexNick]=1
+        # проверяем - существует ли комбинация, при которой возможна идентичность        
+        return self._isExistFioCombination(compareResult)       
 
-def isExistFioCombination(compareResult):
-    # если в фио всего один элемент - рассматриваем отдельно
-    sumResultFIO=[]
+    def _isExistFioCombination(self, compareResult):
+        # если в фио всего один элемент - рассматриваем отдельно
+        sumResultFIO=[]
 
-    # считаем все суммы по каждому элемнту ФИО
-    for indexFIO in range(len(compareResult)):
-        sumResultFIO.append(sum(compareResult[indexFIO][i] for i in range(len(compareResult[indexFIO]))))
-    
-    # никнейм
-    sumResultNick=[]
-    # считаем все суммы по каждому элементу никнейма  
-    for indexNick in range(len(compareResult[0])):
-        sumResultNick.append(0)
+        # считаем все суммы по каждому элемнту ФИО
         for indexFIO in range(len(compareResult)):
-            sumResultNick[len(sumResultNick)-1]+=compareResult[indexFIO][indexNick]
-    
-    cntNonZero=0
-    
-    if (len(sumResultFIO)<len(sumResultNick)):
-        if 0 in sumResultFIO:
-            return False
-        elif sumResultNick.count(1)<len(sumResultFIO):
-            return False
-        else:
-            return True
-    else:
-        if 0 in sumResultNick:
-            return False
-        elif sumResultFIO.count(1)<len(sumResultNick):
-            return False
-        else:
-            return True
-   
-   
-# Функция, которая пытается найти сопоставления путем приведения к Верхнему регистру начальных символов,
-# остальных к нижнему регистру, а также путем дальнейшего удаления знаков
-def getPartsFormNickAlgoritm(nick, variants):
-     # приводим к пробелам все знаки
-    if variantsOfAlgoritm.withSpace in variants:
-        nick=turnToSpacesSigns(nick)
-    # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
-    if variantsOfAlgoritm.withUpperBeginAndLowerAnother in variants:
-        nick=beginOfWordToUpRegister(nick, True)   
-    # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
-    elif variantsOfAlgoritm.withUpperBegin in variants:
-        nick=beginOfWordToUpRegister(nick)  
-
-    # Получаем составные части никнейма
-    return parseNameToParts(nick)
-   
-   
-# Функция сопоставления никнейма по массиву фамилий
-# Получаем посещаемость для ускорения работы
-def compareNickAndFIOs(group, nickArr, FIOs):
-    resultArray=[] # массив результата - записывает индексы ФИО
-    isEqual=False # Флаг - было ли равенство
-    # Сопостоавляем для каждого ФИО
-    for indexFIO in range(len(FIOs)):
-         # если никнейм существует по равенству - добавляем в конец рассматриваемого массива
-        if (compareFIOandNick(FIOs[indexFIO], nickArr, True)):
-            isEqual=True
-            resultArray.append(indexFIO)
-        # если никнейм существует по вхождению   
-        elif (compareFIOandNick(FIOs[indexFIO], nickArr)):
-            resultArray.append(indexFIO)
-    # рассматриваем различные случаи результата
-    # если единственное -> уникально, записываем его
-    if (len(resultArray)==1):
+            sumResultFIO.append(sum(compareResult[indexFIO][i] for i in range(len(compareResult[indexFIO]))))
         
-        # если найден по равенству и размер больше 1
-        if (isEqual and len(nickArr)>1):
-            # возвращаем успешное выполнение
+        # никнейм
+        sumResultNick=[]
+        # считаем все суммы по каждому элементу никнейма  
+        for indexNick in range(len(compareResult[0])):
+            sumResultNick.append(0)
+            for indexFIO in range(len(compareResult)):
+                sumResultNick[len(sumResultNick)-1]+=compareResult[indexFIO][indexNick]
+        
+        cntNonZero=0
+        
+        if (len(sumResultFIO)<len(sumResultNick)):
+            if 0 in sumResultFIO:
+                return False
+            elif sumResultNick.count(1)<len(sumResultFIO):
+                return False
+            else:
+                return True
+        else:
+            if 0 in sumResultNick:
+                return False
+            elif sumResultFIO.count(1)<len(sumResultNick):
+                return False
+            else:
+                return True
+       
+       
+    # Функция, которая пытается найти сопоставления путем приведения к Верхнему регистру начальных символов,
+    # остальных к нижнему регистру, а также путем дальнейшего удаления знаков
+    def _getPartsFormNickAlgoritm(self, nick, variants):
+         # приводим к пробелам все знаки
+        if variantsOfAlgoritm.withSpace in variants:
+            nick=self._turnToSpacesSigns(nick)
+        # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
+        if variantsOfAlgoritm.withUpperBeginAndLowerAnother in variants:
+            nick=self._beginOfWordToUpRegister(nick, True)   
+        # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
+        elif variantsOfAlgoritm.withUpperBegin in variants:
+            nick=self._beginOfWordToUpRegister(nick)  
+
+        # Получаем составные части никнейма
+        return self._parseNameToParts(nick)
+       
+       
+    # Функция сопоставления никнейма по массиву фамилий
+    # Получаем посещаемость для ускорения работы
+    def _compareNickAndFIOs(self, group, nickArr, FIOs):
+        resultArray=[] # массив результата - записывает индексы ФИО
+        isEqual=False # Флаг - было ли равенство
+        # Сопостоавляем для каждого ФИО
+        for indexFIO in range(len(FIOs)):
+             # если никнейм существует по равенству - добавляем в конец рассматриваемого массива
+            if (self._compareFIOandNick(FIOs[indexFIO], nickArr, True)):
+                isEqual=True
+                resultArray.append(indexFIO)
+            # если никнейм существует по вхождению   
+            elif (self._compareFIOandNick(FIOs[indexFIO], nickArr)):
+                resultArray.append(indexFIO)
+        # рассматриваем различные случаи результата
+        # если единственное -> уникально, записываем его
+        if (len(resultArray)==1):
+            
+            # если найден по равенству и размер больше 1
+            if (isEqual and len(nickArr)>1):
+                # возвращаем успешное выполнение
+                return successState.SuccessfulCompare, resultArray
+            # иначе недостаточно уникален по данным   
+            else:
+                return warningState.CompareButNotEqual, resultArray   
+            
+            # возвращаем ФИО
             return successState.SuccessfulCompare, resultArray
-        # иначе недостаточно уникален по данным   
-        else:
-            return warningState.CompareButNotEqual, resultArray   
-        
-        # возвращаем ФИО
-        return successState.SuccessfulCompare, resultArray
-    # если не существует
-    elif (len(resultArray)<=0):
-        return errorState.NotExist, resultArray
-    # если не уникален
-    else:
-        return errorState.NotUnique, resultArray
- 
-# вспомогательная функция сравнения двух массивов на равенство (без учета регистров)
-def compareArrsWthoutRegister(arr1, arr2):
-    # если размеры не равны:
-    if (len(arr1)!=len(arr2)):
-        return False
-    # по каждому элементу
-    for index in range(len(arr1)):
-        # если элементы не равны
-        if (arr1[index].lower()!=arr2[index].lower()):
-            return False
-    # списки равны
-    return True  
-    
-   
-# производит поиск по всем ФИО
-# Принимает на вход массив массив групп, массив класса данных, никнейм
-# Возвращает результат обработки, массив значений расстановки оценок
-# результатом возвращает 
-def findFIOfromFIOsToNick(group, nick, FIOs):  
-    # получаем группу и никнейм с вырезанной группой
-    groupAndNick=getGroupAndNickWthoutGroup(group, nick)
-    # если группа неизвестная
-    if (groupAndNick == errorState.UnknownGroup):
-        return (errorState.UnknownGroup, [])
-    
-    # извлекаем соответствующую группу
-    group=groupAndNick[0]
-    
-    # извлекаем никнейм без группы из самого массива
-    parseNick=groupAndNick[1]
-
-    prevNickArrs=[]
-    nickArr=[]
-    indexFIOs=[]
-    # пробегаемся по всем вариантам словаря
-    for variantIndex in range(len(dictVariantsOfAlgoritm)):
-        nickArr = getPartsFormNickAlgoritm(parseNick, dictVariantsOfAlgoritm[variantIndex])
-        # если количество элементов, полученных из ника слишком большое или слишком малое
-        if (len(nickArr)>3 or len(nickArr)<1):
-            continue
-        for prevNick in prevNickArrs:
-            if (compareArrsWthoutRegister(prevNick, nickArr)):
-                prevNickArrs.append(nickArr)
-                continue
-        # если здесь, то не было одинаковых
-        # получаем результат   
-        result, indexFIOs = compareNickAndFIOs(group, nickArr, FIOs)
-        # Если результат не Not exist - возвращаем результат
-        if (result != errorState.NotExist):
-            return result, indexFIOs
-        indexFIOs=[]
-    # если здесь, то не нашли
-    return errorState.NotExist, indexFIOs
-
-# функция, которая проставляет посещения
-#def setActualAtendance(groups, group, googleSheetInfoArray, indexFIO):
-    # проставляем посещаемость
-#    googleSheetInfoArray[groups.index(group)].setAtendanceArrayByIndex(indexFIO)
-
-# заменить в результате все индексы ФИО на ФИО
-def changeIndexOfFIOsResultToFIOs(groups, result):
-    # get group from result
-    group=result[0]
-    # get FIO from result
-    FIOs=result[1]
-    # For all FIOs get from index - FIO
-    for indexFIO  in range(len(FIOs)):
-        # заменяем индекс ФИО на ФИО
-        FIOs[indexFIO]=googleSheetInfoArray[groups.index(group)].getArrayOfPartsFIOByIndex(FIOs[indexFIO])
-    result[1]=FIOs
-    return result
-
-    
-    
-# from ['group', [fio, fio]] set atendance to googleSheetInfoArray
-def setAtendanceByResult(groups, results):
-        group = results[0][0]
-        indexFIO=results[0][1][0]
-        if (googleSheetInfoArray[groups.index(group)].getAtendanceArrayByIndex(indexFIO)!=0):
-            return False
-        else:
-            googleSheetInfoArray[groups.index(group)].setAtendanceArrayByIndex(indexFIO)  
-            return True
- 
-# TODO пока что возвращаем, но возможно лучше здесь же проставлять посещаемость, записывать ошибки и предупреждения
-# основная функция поиска ника серди всех групп и всех фамилий
-def findNickFromGroupAndFIO(groups, nick):
-    global resultErrors
-    global resultWarnings
-
-    isCompareButNotEqual = False # для случая нехватки данных
-    isExistGroup = False # если группа существует
-    results=[] # содержит группу и ФИО
-
-    # пробег по всем группам
-    for indexGroup in range(len(groups)):
-        result, indexFIOs = findFIOfromFIOsToNick(groups[indexGroup], 
-        nick,
-        googleSheetInfoArray[indexGroup].getArrayOfPartsFIOs()
-        )
+        # если не существует
+        elif (len(resultArray)<=0):
+            return errorState.NotExist, resultArray
         # если не уникален
-        if (result==errorState.NotUnique):
-            # clear all, that we have before and set not unique result
-            results=[groups[indexGroup], indexFIOs]
-            # convert result to string
-            results = changeIndexOfFIOsResultToFIOs(groups, results)
-            resultErrors.append(getErrorOrWarning(errorState.NotUnique, nick, results))
-            # increase result counter
-            incDictResult(errorState.NotUnique)
-            return 
+        else:
+            return errorState.NotUnique, resultArray
+     
+    # вспомогательная функция сравнения двух массивов на равенство (без учета регистров)
+    def _compareArrsWthoutRegister(self, arr1, arr2):
+        # если размеры не равны:
+        if (len(arr1)!=len(arr2)):
+            return False
+        # по каждому элементу
+        for index in range(len(arr1)):
+            # если элементы не равны
+            if (arr1[index].lower()!=arr2[index].lower()):
+                return False
+        # списки равны
+        return True  
         
-        # Если резльтат успешное совпадение, то добавляем в конец
-        if (result==successState.SuccessfulCompare):
-            results.append([groups[indexGroup], indexFIOs])
-            
-        # Если резльтат "уникально и совпало, но не равно"
-        if (result==warningState.CompareButNotEqual):
-            isCompareButNotEqual=True
-            results.append([groups[indexGroup], indexFIOs])
-            
-        if (result!=errorState.UnknownGroup):
-            isExistGroup = True
-   
-    # если ровно одно совпадение
-    if (len(results)==1):      
+       
+    # производит поиск по всем ФИО
+    # Принимает на вход массив массив групп, массив класса данных, никнейм
+    # Возвращает результат обработки, массив значений расстановки оценок
+    # результатом возвращает 
+    def _findFIOfromFIOsToNick(self, group, nick, FIOs):  
+        # получаем группу и никнейм с вырезанной группой
+        groupAndNick=self._getGroupAndNickWthoutGroup(group, nick)
+        # если группа неизвестная
+        if (groupAndNick == errorState.UnknownGroup):
+            return (errorState.UnknownGroup, [])
+        
+        # извлекаем соответствующую группу
+        group=groupAndNick[0]
+        
+        # извлекаем никнейм без группы из самого массива
+        parseNick=groupAndNick[1]
+
+        prevNickArrs=[]
+        nickArr=[]
+        indexFIOs=[]
+        # пробегаемся по всем вариантам словаря
+        for variantIndex in range(len(dictVariantsOfAlgoritm)):
+            nickArr = self._getPartsFormNickAlgoritm(parseNick, dictVariantsOfAlgoritm[variantIndex])
+            # если количество элементов, полученных из ника слишком большое или слишком малое
+            if (len(nickArr)>3 or len(nickArr)<1):
+                continue
+            for prevNick in prevNickArrs:
+                if (self._compareArrsWthoutRegister(prevNick, nickArr)):
+                    prevNickArrs.append(nickArr)
+                    continue
+            # если здесь, то не было одинаковых
+            # получаем результат   
+            result, indexFIOs = self._compareNickAndFIOs(group, nickArr, FIOs)
+            # Если результат не Not exist - возвращаем результат
+            if (result != errorState.NotExist):
+                return result, indexFIOs
+            indexFIOs=[]
+        # если здесь, то не нашли
+        return errorState.NotExist, indexFIOs
+
+    # функция, которая проставляет посещения
+    #def setActualAtendance(groups, group, self.__googleSheetInfoArray, indexFIO):
         # проставляем посещаемость
-        # если посещаемость уже была проставлена
-        if (setAtendanceByResult(groups, results) == False):
-            results=changeIndexOfFIOsResultToFIOs(groups, results[0])
-            resultWarnings.append(getErrorOrWarning(warningState.AlreadySetAtendance, nick, results))  
-            # increase result counter
-            incDictResult(warningState.AlreadySetAtendance)
-        else:
-            # преобразум все индексы ФИО в ФИО
-            results=changeIndexOfFIOsResultToFIOs(groups, results[0])
-            # increase result counter
-            incDictResult(successState.SuccessfulCompare)
+    #    self.__googleSheetInfoArray[groups.index(group)].setAtendanceArrayByIndex(indexFIO)
+
+    # заменить в результате все индексы ФИО на ФИО
+    def _changeIndexOfFIOsResultToFIOs(self, groups, result):
+        # get group from result
+        group=result[0]
+        # get FIO from result
+        FIOs=result[1]
+        # For all FIOs get from index - FIO
+        for indexFIO  in range(len(FIOs)):
+            # заменяем индекс ФИО на ФИО
+            FIOs[indexFIO]=self.__googleSheetInfoArray[groups.index(group)].getArrayOfPartsFIOByIndex(FIOs[indexFIO])
+        result[1]=FIOs
+        return result
+
         
-        # случаи равенства
-        if (isCompareButNotEqual):
-            resultWarnings.append(getErrorOrWarning(warningState.CompareButNotEqual, nick, results))
+        
+    # from ['group', [fio, fio]] set atendance to self.__googleSheetInfoArray
+    def _setAtendanceByResult(self, groups, results):
+            group = results[0][0]
+            indexFIO=results[0][1][0]
+            if (self.__googleSheetInfoArray[groups.index(group)].getAtendanceArrayByIndex(indexFIO)!=0):
+                return False
+            else:
+                self.__googleSheetInfoArray[groups.index(group)].setAtendanceArrayByIndex(indexFIO)  
+                return True
+     
+    # TODO пока что возвращаем, но возможно лучше здесь же проставлять посещаемость, записывать ошибки и предупреждения
+    # основная функция поиска ника серди всех групп и всех фамилий
+    def _findNickFromGroupAndFIO(self, groups, nick):
+        isCompareButNotEqual = False # для случая нехватки данных
+        isExistGroup = False # если группа существует
+        results=[] # содержит группу и ФИО
+
+        # пробег по всем группам
+        for indexGroup in range(len(groups)):
+            result, indexFIOs = self._findFIOfromFIOsToNick(groups[indexGroup], 
+            nick,
+            self.__googleSheetInfoArray[indexGroup].getArrayOfPartsFIOs()
+            )
+            # если не уникален
+            if (result==errorState.NotUnique):
+                # clear all, that we have before and set not unique result
+                results=[groups[indexGroup], indexFIOs]
+                # convert result to string
+                results = self._changeIndexOfFIOsResultToFIOs(groups, results)
+                self.__resultErrors.append(self._getErrorOrWarning(errorState.NotUnique, nick, results))
+                # increase result counter
+                self._incDictResult(errorState.NotUnique)
+                return 
             
-        return
-
-    for indexResult in range(len(results)):
-        results[indexResult]=changeIndexOfFIOsResultToFIOs(groups, results[indexResult])      
-    
-    # если не найдено совпадений
-    if (len(results)<=0):
-        # если группа существует
-        if (isExistGroup):
-            resultErrors.append(getErrorOrWarning(errorState.NotExist, nick, results))
-            # increase result counter
-            incDictResult(errorState.NotExist)
-        # если же не существует
-        else:
-            resultErrors.append(getErrorOrWarning(errorState.UnknownGroup, nick))
-            # increase result counter
-            incDictResult(errorState.UnknownGroup)
+            # Если резльтат успешное совпадение, то добавляем в конец
+            if (result==successState.SuccessfulCompare):
+                results.append([groups[indexGroup], indexFIOs])
+                
+            # Если резльтат "уникально и совпало, но не равно"
+            if (result==warningState.CompareButNotEqual):
+                isCompareButNotEqual=True
+                results.append([groups[indexGroup], indexFIOs])
+                
+            if (result!=errorState.UnknownGroup):
+                isExistGroup = True
+       
+        # если ровно одно совпадение
+        if (len(results)==1):      
+            # проставляем посещаемость
+            # если посещаемость уже была проставлена
+            if (self._setAtendanceByResult(groups, results) == False):
+                results=self._changeIndexOfFIOsResultToFIOs(groups, results[0])
+                self.__resultWarnings.append(self._getErrorOrWarning(warningState.AlreadySetAtendance, nick, results))  
+                # increase result counter
+                self._incDictResult(warningState.AlreadySetAtendance)
+            else:
+                # преобразум все индексы ФИО в ФИО
+                results=self._changeIndexOfFIOsResultToFIOs(groups, results[0])
+                # increase result counter
+                self._incDictResult(successState.SuccessfulCompare)
             
-    # если найдено больше двух совпадений (поиск по двум группам)
-    else:
-        resultErrors.append(getErrorOrWarning(errorState.NotUniqueByGroup, nick, results))
-        # increase result counter
-        incDictResult(errorState.NotUniqueByGroup)
+            # случаи равенства
+            if (isCompareButNotEqual):
+                self.__resultWarnings.append(self._getErrorOrWarning(warningState.CompareButNotEqual, nick, results))
+                
+            return
 
-# функция, которая пробегается по каждому нику
-def findAllNicksFromGroupAndFIO(groups, nicks):
-    for indexNick in range(len(nicks)):
-        # в качестве результата принимаем строку ошибки либо пустую строку, если все хороошо
-        findNickFromGroupAndFIO(groups, nicks[indexNick])
-
-def convertFIOsToPartFIOs(FIOs):
-    for index in range(len(FIOs)):
-
-        FIOs[index]=parseNameToParts(FIOs[index])
-    return FIOs
-
-# TODO функция формирования для группы объекта класса GoogleSheetInfo 
-def convertFromGoogleSheet(groups, startAtendances, arrayFIOs, atendances):
-    global resultErrors
-    if (len(groups)!=len(startAtendances)
-        or len(groups)!=len(arrayFIOs)
-        or len(groups)!=len(atendances)):
-        resultErrors.append("Data from google sheet is not correct - parts have different length!")
-        return False
-    # convert info:
-    for index in range(len(groups)):     
-        googleSheetInfoArray.append(
-            GoogleSheetInfo(groups[index], startAtendances[index], convertFIOsToPartFIOs(arrayFIOs[index]), atendances[index]))
-    return True
-    
-    
-# функция, которая записывает информацию из googleSheet в массив класса GoogleSheetInfo - возвращает этот массив
-# Причем, при записи ФИО сразу преобразует в формат частей ФИО
-# также заносит все никнеймы в гугл таблицу - принимает массивы
-# date - дата, по которой и будет происходить запись
-def getAndConvertGoogleSheetInfo(date, googleSheet):
-    global resultErrors
-    # массив данных
-    global googleSheetInfoArray
-    try:
-        groups, startAtendances, arrayFIOs, atendances = googleSheet.getGoogleSheetInfoByDate(date)
-    except:
-        resultErrors.append('Get bad info from google sheet. May be something wrong with connection.')
-        return False, []
-
-    
-    return convertFromGoogleSheet(groups, startAtendances, arrayFIOs, atendances), groups
-
-
-# получить массив начальных позаций
-def getStartAtendancesForGoogleSheet():
-    startAtendances=[]
-    for index in range(len(googleSheetInfoArray)):
-        startAtendances.append(googleSheetInfoArray[index].getPositionInGoogleList())
-    return startAtendances 
-
-# получить массив посещений
-def getAtendancesForGoogleSheet():
-    atendances=[]
-    for index in range(len(googleSheetInfoArray)):
-        atendances.append(googleSheetInfoArray[index].getAtendanceArray())
-    return atendances  
-    
-
-# функция, которая проставляет новую информацию по посещениям
-def setAtendanceFromNicksToGoogleSheet(date, nicks):
-    global dictResult
-    # Обнуляем предупреждения и ошибки
-    global resultWarnings
-    global resultErrors
-    resultWarnings=[]
-    resultErrors=[]
-    # очищаем основной массив
-    global googleSheetInfoArray
-    googleSheetInfoArray.clear()
-    # очищаем результат
-    clearDictResult()
-    
-    googleSheet=None
-    try:
-        googleSheet = googleSheetDefault.GoogleSheet()
-    except:
-        print('Something wrong with the connection to GoogleSheet...')
-    
-    
-    result, groups = getAndConvertGoogleSheetInfo(date, googleSheet)
-    #print(len(googleSheetInfoArray))
-    #for element in googleSheetInfoArray:
-    #    print(element.getGroup())
-    #    print(element.getAtendanceArray())        
-    #    print(element.getArrayOfPartsFIOs())
-    #    print(element.getAtendanceArray())    
+        for indexResult in range(len(results)):
+            results[indexResult]=self._changeIndexOfFIOsResultToFIOs(groups, results[indexResult])      
         
-    if (result==False):
-        return result, '', resultWarnings, resultErrors
-    
-    findAllNicksFromGroupAndFIO(groups, nicks)
-    
-    startAtendances=getStartAtendancesForGoogleSheet()
-    
-    atendances=getAtendancesForGoogleSheet()      
-    
-    result, sendErrors = googleSheet.setAllAtendancesSheet(groups, startAtendances, atendances)
-    
-    # объединяем списки ошибок
-    resultErrors+=sendErrors
-    
-    return result, dictResultToMessage(), resultWarnings, resultErrors
+        # если не найдено совпадений
+        if (len(results)<=0):
+            # если группа существует
+            if (isExistGroup):
+                self.__resultErrors.append(self._getErrorOrWarning(errorState.NotExist, nick, results))
+                # increase result counter
+                self._incDictResult(errorState.NotExist)
+            # если же не существует
+            else:
+                self.__resultErrors.append(self._getErrorOrWarning(errorState.UnknownGroup, nick))
+                # increase result counter
+                self._incDictResult(errorState.UnknownGroup)
+                
+        # если найдено больше двух совпадений (поиск по двум группам)
+        else:
+            self.__resultErrors.append(self._getErrorOrWarning(errorState.NotUniqueByGroup, nick, results))
+            # increase result counter
+            self._incDictResult(errorState.NotUniqueByGroup)
+
+    # функция, которая пробегается по каждому нику
+    def _findAllNicksFromGroupAndFIO(self, groups, nicks):
+        for indexNick in range(len(nicks)):
+            # в качестве результата принимаем строку ошибки либо пустую строку, если все хороошо
+            self._findNickFromGroupAndFIO(groups, nicks[indexNick])
+
+    def _convertFIOsToPartFIOs(self, FIOs):
+        for index in range(len(FIOs)):
+
+            FIOs[index]=self._parseNameToParts(FIOs[index])
+        return FIOs
+
+    # TODO функция формирования для группы объекта класса GoogleSheetInfo 
+    def _convertFromGoogleSheet(self, groups, startAtendances, arrayFIOs, atendances):
+        if (len(groups)!=len(startAtendances)
+            or len(groups)!=len(arrayFIOs)
+            or len(groups)!=len(atendances)):
+            self.__resultErrors.append("Data from google sheet is not correct - parts have different length!")
+            return False
+        # convert info:
+        for index in range(len(groups)):     
+            self.__googleSheetInfoArray.append(
+                GoogleSheetInfo(groups[index], startAtendances[index], self._convertFIOsToPartFIOs(arrayFIOs[index]), atendances[index]))
+        return True
         
+        
+    # функция, которая записывает информацию из googleSheet в массив класса GoogleSheetInfo - возвращает этот массив
+    # Причем, при записи ФИО сразу преобразует в формат частей ФИО
+    # также заносит все никнеймы в гугл таблицу - принимает массивы
+    # date - дата, по которой и будет происходить запись
+    def _getAndConvertGoogleSheetInfo(self, date, googleSheet):
+        try:
+            groups, startAtendances, arrayFIOs, atendances = googleSheet.getGoogleSheetInfoByDate(date)
+        except:
+            self.__resultErrors.append('Get bad info from google sheet. May be something wrong with connection.')
+            return False, []
+
+        
+        return self._convertFromGoogleSheet(groups, startAtendances, arrayFIOs, atendances), groups
+
+
+    # получить массив начальных позаций
+    def _getStartAtendancesForGoogleSheet(self):
+        startAtendances=[]
+        for index in range(len(self.__googleSheetInfoArray)):
+            startAtendances.append(self.__googleSheetInfoArray[index].getPositionInGoogleList())
+        return startAtendances 
+
+    # получить массив посещений
+    def _getAtendancesForGoogleSheet(self):
+        atendances=[]
+        for index in range(len(self.__googleSheetInfoArray)):
+            atendances.append(self.__googleSheetInfoArray[index].getAtendanceArray())
+        return atendances  
+        
+
+    # функция, которая проставляет новую информацию по посещениям
+    def setAtendanceFromNicksToGoogleSheet(self, date, nicks):
+        # Обнуляем предупреждения и ошибки
+        self.__resultWarnings=[]
+        self.__resultErrors=[]
+        # очищаем основной массив
+        self.__googleSheetInfoArray.clear()
+        # очищаем результат
+        self._clearDictResult()
+        
+        googleSheet=None
+        try:
+            googleSheet = googleSheetDefault.GoogleSheet()
+        except:
+            print('Something wrong with the connection to GoogleSheet...')
+        
+        
+        result, groups = self._getAndConvertGoogleSheetInfo(date, googleSheet)
+        #print(len(self.__googleSheetInfoArray))
+        #for element in self.__googleSheetInfoArray:
+        #    print(element.getGroup())
+        #    print(element.getAtendanceArray())        
+        #    print(element.getArrayOfPartsFIOs())
+        #    print(element.getAtendanceArray())    
+            
+        if (result==False):
+            return result, '', self.__resultWarnings, self.__resultErrors
+        
+        self._findAllNicksFromGroupAndFIO(groups, nicks)
+        
+        startAtendances=self._getStartAtendancesForGoogleSheet()
+        
+        atendances=self._getAtendancesForGoogleSheet()      
+        
+        result, sendErrors = googleSheet.setAllAtendancesSheet(groups, startAtendances, atendances)
+        
+        # объединяем списки ошибок
+        self.__resultErrors+=sendErrors
+        
+        return result, self.__dictResultToMessage(), self.__resultWarnings, self.__resultErrors
+            
+
+
+googleSheetParser=GoogleSheetParser()
 
 # DELETE NICKS, BUT ON DISCORD STAGE
 nicks=['ПетровАндрdfB@49#3$3№ейВлад23432имирович', 'игор4933', 'русакова дарья 4933', '4933останин']
 
-
-result, messageResult, resWarnings, resErrors = setAtendanceFromNicksToGoogleSheet('09.04', nicks)
-
+result, messageResult, resWarnings, resErrors = googleSheetParser.setAtendanceFromNicksToGoogleSheet('09.04', nicks)
 
 print(result)
 print(messageResult)
