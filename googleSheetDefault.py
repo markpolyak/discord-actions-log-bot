@@ -230,9 +230,9 @@ class GoogleSheet:
         """
         Convert atendances to similar size with equal by index element in lenArray
         
-        :param atendances: non convert attandance for ALL sheets
+        :param atendances: array of non convert atendance for ALL sheets
         :param lenArray: FIO arrays for ALL sheets 
-        :returns: array of attandance, converted to length of lenArray
+        :returns: array of atendance, converted to length of lenArray
         """
         convertAtendances=[]
 
@@ -328,11 +328,29 @@ class GoogleSheet:
 
 
     # get standart print of range
-    def getRange(self, nameList, startCol, startRow, endCol, endRow):
-        return str(nameList)+'!'+str(startCol)+str(startRow)+':'+str(endCol)+str(endRow)
+    def getRange(self, nameSheet, startCol, startRow, endCol, endRow):
+        """
+        Get range of region for sending info to google sheet
+        
+        :param nameSheet: string name of the sheet
+        :param startCol: start horizontal position of the region - string word
+        :param startRow: start vertical position of the region - integer number
+        :param endCol: end horizontal position of region - string word
+        :param endRow: end vertical position of the region - integer number
+        
+        :returns: region in format '{nameSheet}!{startCol}{startRow}:{endCol}{endRow}'           
+        """
+        return str(nameSheet)+'!'+str(startCol)+str(startRow)+':'+str(endCol)+str(endRow)
     
     
     def _getColNameFromColInt(self, col):
+        """
+        Get name of col in google sheet from col number
+        
+        :param col: int horizontal number in google Sheet
+     
+        :returns: col like in google sheet: 2-> 'C', 27-> 'AB'         
+        """
         row=''
         while (col>0):
             row=chr(ord('A')+int(col%self._len_English_Sub))+row
@@ -341,6 +359,13 @@ class GoogleSheet:
       
        
     def _convertToSendAtendance(self, rowAtendanse):
+        """
+        Get attandance in format to send - in col, without 0 (converted to '')
+        
+        :param rowAtendanse: standart array attandanse for one sheet
+     
+        :returns: data for sending in col format: [0, 1, 0] -> [[''],[1],['']]         
+        """
         colAtendanse=[]
         for atendance in rowAtendanse:
             if (atendance==0):
@@ -350,14 +375,22 @@ class GoogleSheet:
         return colAtendanse
     
     
-    def _updateAttendanseSheet(self, nameList, col, startRow, endRow, atendanse):
-        print(col)
+    def _updateAttendanseSheet(self, nameSheet, col, startRow, endRow, atendanse):
+        """
+        Update region (which is atendanse) in google sheet with using convertation of row atendanse
+        
+        :param nameSheet: string name of the sheet
+        :param col: horizontal position of the atendanse - integer number
+        :param startRow: start vertical position of the atendanse - integer number
+        :param endCol: end horizontal position of atendanse - string word
+        :param aatendanse: row of atendanse for nameSheet (group)
+        
+        :returns: count of updated cells (all of them, even not changed...)           
+        """
         atendanse=self._convertToSendAtendance(atendanse)
         col=self._getColNameFromColInt(col)
-        print(atendanse)
-        print(self.getRange(nameList, col, startRow, col, endRow))
         data = [{
-            'range': self.getRange(nameList, col, startRow, col, endRow),
+            'range': self.getRange(nameSheet, col, startRow, col, endRow),
             'values': atendanse
         }]
         body = {
@@ -365,19 +398,41 @@ class GoogleSheet:
             'data': data
         }
         result = self.__spreadsheet.values().batchUpdate(spreadsheetId=googleSheetSettings.google_spreadsheet_id, body=body).execute()
-        print('{0} cells updated.'.format(result.get('totalUpdatedCells')))
+        return result.get('totalUpdatedCells')
 
         
        
     def setAllAtendancesSheet(self, sheets, colPositionDate, atendances):
-        for index in range(len(sheets)):
-            self._updateAttendanseSheet(sheets[index], 
-                colPositionDate[index], 
-                self._row_start_date_atendance+self._shift_rows+1, 
-                self._row_start_date_atendance+self._shift_rows+len(atendances[index]), 
-                atendances[index])
-              
+        """
+        Update region (which is atendanse) in google sheet for all sheets
         
+        :param sheets: array of google sheet (equal group)
+        :param colPositionDate: array of horizontal position of the atendanse for every sheet
+        :param atendances: array of attandance (which is array too) for every sheet (group)
+        
+        :returns:   isSendSomething - result of send (did we send somthing?)
+                    sendErrors - log of errors, which we get, when send information
+        """
+        isSendSomething=False
+        sendErrors = []
+        for index in range(len(sheets)):
+            if (len(atendances[index])>0):
+                try:
+                    if (self._updateAttendanseSheet(sheets[index], 
+                        colPositionDate[index], 
+                        self._row_start_date_atendance+self._shift_rows+1, 
+                        self._row_start_date_atendance+self._shift_rows+len(atendances[index]), 
+                        atendances[index])>0):
+                        isSendSomething=True                    
+                    else:
+                        sendErrors.append["For unknown reasons we can't send atendance info to group" + sheets[index] + ' (zero updated)'] 
+                except:
+                    sendErrors.append["For unknown reasons we can't send atendance info to group" + sheets[index] + " (can't connect to sheet)"] 
+            else:
+                # we can check this, where we get info - but in main fuction we couldn't find man with empty group (it can help to teacher)
+                sendErrors.append['For group ' + sheets[index] + ' length of atendance equal zero']      
+            return isSendSomething, sendErrors
+
 
 # Body Of some external Function
 googleTable=None
@@ -401,4 +456,6 @@ print(FIOs)
 print(startAtendances)
 print(atendances)
 
-googleTable.setAllAtendancesSheet(groups, startAtendances, atendances)
+isSendSomething, sendErrors = googleTable.setAllAtendancesSheet(groups, startAtendances, atendances)
+print(isSendSomething)
+print(sendErrors)
