@@ -64,10 +64,10 @@ class GoogleSheetInfo:
             self.__attendanceArray[index] = attendanceArrayElement
  
 # special variants, which is not similar in lower in upper  
-fromRusToEngSpecial={'т':'t', 'в':'b','р':'r', 'Т':'T', 'В':'B', 'Р':'P'}
-# defaul variants, which is similar in lower in upper  
-fromRusToEngDefault={'К':'K', 'М':'M', 'Е':'E', 'С':'C', 'Х':'X', 'У':'Y', 'О':'O', 'А':'A'}
+exceptionsFromEngToRus=['t', 'b','r']
 
+# defaul variants, which is similar in lower and in upper? or only an upper (for exceptions variants) 
+fromEngToRusDefault={'K':'К', 'M':'М', 'E':'Е', 'C':'С', 'X':'Х', 'Y':'У', 'O':'О', 'A':'А', 'T':'Т', 'B':'В', 'P':'Р'}
 # Предупреждения
 resultErrors=[]
 # Ошибки
@@ -92,8 +92,8 @@ class variantsOfAlgoritm(enum.Enum):
         withSpace = 1 # приводим к пробелам
         withUpperBegin = 2 # приводим к верхнему регистру начало
         withUpperBeginAndLowerAnother = 3 # приводим к верхнему регистру начало, остальное к нижнему
-        #withReverseToRussian = 4
 
+# we can choose only few of them
 dictVariantsOfAlgoritm = {
     0 : [variantsOfAlgoritm.withSpace],
     1 : [variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBegin],
@@ -191,24 +191,13 @@ def getIndexFirstDigit(stroka, startPosition = 0):
 
 # приводим к нижнему регистру и к английскому алфавиту подобные
 def toGroupStandartSymb(symbGroup):
-    # russian case
-    # T=T, но т!=t!
-    if (symbGroup == 'т'):
-        return 't'
-    #  В=В, но  в!=b
-    if (symbGroup == 'в'):
-        return 'b'
-        
-    if (symbGroup == 'р'):
-        return 'r'
-   
-    if symbGroup in fromRusToEngSpecial:
-       return fromRusToEngSpecial[symbGroup].upper()
+    if symbGroup in exceptionsFromEngToRus:
+       return symbGroup.upper()
     
     # to Up register   
     symbGroup = symbGroup.upper()
-    if symbGroup in fromRusToEngDefault:
-        return fromRusToEngDefault[symbGroup]
+    if symbGroup in fromEngToRusDefault:
+        return fromEngToRusDefault[symbGroup]
     else:
         return symbGroup
     
@@ -690,7 +679,7 @@ def setAttendanceInGoogleSheet(nicks):
     
 
 # DELETE NICKS, BUT ON DISCORD STAGE
-nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игор4933']
+nicks=['ПетровАндрdfB@49#3$3№ейВлад23432имирович', 'игор4933']
 
 setActualAttendance(groups, googleSheetInfoArray, nicks)
 
