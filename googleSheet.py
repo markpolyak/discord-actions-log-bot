@@ -67,6 +67,23 @@ class groupState(enum.Enum):
         # 2 Наименования
         # 3 Наименования
 
+
+# преобразует массив вида [group, [arrfio, arrfio]] в строку вида "'group': 'f i o' 'f i o'; "
+def getStringForErrorsAndWarnings(info):
+    groupFIO=info[0]
+    FIOs=info[1]
+    print('there------')
+    print(FIOs)
+    # set group
+    result = "'" + info[0]+ "'" + ": "
+    # для каждого arrfio
+    for index in range(len(FIOs)):
+        if (index!=0):
+            result+=' '
+        result+="'"+' '.join(FIOs[index])+"'"
+    result+=';'
+    return result
+
 # Получить предупреждение или ошибку        
 def getErrorOrWarning(enumValue, nick, info=[]):
     nick=str(nick)
@@ -76,29 +93,16 @@ def getErrorOrWarning(enumValue, nick, info=[]):
     if (enumValue == groupState.UnknownGroup):
         return "Error: '" + nick + "' have wrong group or group doesn't exists in google sheet"
     elif (enumValue ==  enumValue == groupState.NotUniqueByGroup):
-        result = "Error: '" + nick + "' have more than one coincidence in different groups: "
+        result = "Error: '" + nick + "' have more than one coincidence in different groups - "
         for indexGroupFIO in range(len(info)):
-            groupFIO=info[indexGroupFIO][0]
-            FIOs=info[indexGroupFIO][1]
-            for index in range(len(FIOs)):
-                FIOs[index]==' '.join(FIOs[index])
-            FIOs=','.join(FIOs)
-            result+= " in " + groupFIO + " exist: " + FIOs + ";"
+            result+= " in group " +  getStringForErrorsAndWarnings(info[indexGroupFIO])
         return result
     elif (enumValue == namePersonState.NotExist):
         return "Error: '" + nick + "' not Exist in google sheet;"
     elif (enumValue == namePersonState.NotUnique):
-        group=info[0]
-        FIOs=info[1]
-        for index in range(len(FIOs)):
-            FIOs[index]==' '.join(FIOs[index])
-        FIOs=','.join(FIOs)
-        return "Error: '" + nick + "' not unique in google sheet. In group " + group + ' compare with FIO: ' + FIOs        
+        return "Error: '" + nick + "' not unique in google sheet - in group " + getStringForErrorsAndWarnings(info)       
     elif (enumValue == namePersonState.SuccessfulCompareButNotEqual):
-        group=info[0]
-        FIO=info[1][0]
-        FIO=','.join(FIO)
-        return "Warning: nick '" + nick + "' is short, but we find an unique in group " + group + ' - with FIO -' + FIO 
+        return "Warning: nick '" + nick + "' is short, but we find an unique - in group " + getStringForErrorsAndWarnings(info)
     else:
         return ''
   
@@ -123,7 +127,7 @@ class GoogleSheetInfo:
         return self.__arrayOfPartsFIOs
     
     def getArrayOfPartsFIOByIndex(self, index):
-        if (index>0 and index<len(self.__arrayOfPartsFIOs)):
+        if (index>=0 and index<len(self.__arrayOfPartsFIOs)):
             return self.__arrayOfPartsFIOs[index]
         else:
             return ''
@@ -511,21 +515,17 @@ def setActualAttendance(groups, group, googleSheetInfoArray, indexFIO):
     googleSheetInfoArray[groups.index(group)].setAttendanceArrayByIndex(indexFIO)
 
 # заменить в результате все индексы ФИО на ФИО
-def changeIndexOfFIOsResultToFIOs(groups, results, googleSheetInfoArray):
-    print(groups)
-    print(results)
-    # преобразум все индексы ФИО в ФИО
-    for indexResult in range(len(results)):
-        group=results[indexResult][0]
-        print(group)
-        FIOs=results[indexResult][1]
-        print(FIOs)
-        for indexFIO  in range(len(FIOs)):
-            # заменяем индекс ФИО на
-            print(googleSheetInfoArray[groups.index(group)])
-            FIOs[indexFIO]=googleSheetInfoArray[groups.index(group)].getArrayOfPartsFIOByIndex(FIOs[indexFIO])
-        results[indexResult][1]=FIOs
-    return results
+def changeIndexOfFIOsResultToFIOs(groups, result, googleSheetInfoArray):
+    # get group from result
+    group=result[0]
+    # get FIO from result
+    FIOs=result[1]
+    # For all FIOs get from index - FIO
+    for indexFIO  in range(len(FIOs)):
+        # заменяем индекс ФИО на ФИО
+        FIOs[indexFIO]=googleSheetInfoArray[groups.index(group)].getArrayOfPartsFIOByIndex(FIOs[indexFIO])
+    result[1]=FIOs
+    return result
     
 # TODO пока что возвращаем, но возможно лучше здесь же проставлять посещаемость, записывать ошибки и предупреждения
 # основная функция поиска ника серди всех групп и всех фамилий
@@ -542,9 +542,11 @@ def findNickFromGroupAndFIO(groups, googleSheetInfoArray, nick):
         )
         # если не уникален
         if (result==namePersonState.NotUnique):
-            results.append([groups[indexGroup], indexFIOs])
-            results=changeIndexOfFIOsResultToFIOs(groups, results, googleSheetInfoArray)
-            return results[0], googleSheetInfoArray
+            # clear all, that we have before and set not unique result
+            results=[groups[indexGroup], indexFIOs]
+            # convert result to string
+            results = changeIndexOfFIOsResultToFIOs(groups, results, googleSheetInfoArray)
+            return  getErrorOrWarning(namePersonState.NotUnique, nick, results), googleSheetInfoArray
         
         # Если резльтат успешное совпадение, то добавляем в конец
         if (result==namePersonState.SuccessfulCompare):
@@ -566,6 +568,8 @@ def findNickFromGroupAndFIO(groups, googleSheetInfoArray, nick):
         result = results[0]
         group = result[0]
         indexFIO=result[1][0]
+        # TODO проверка на отсутствие посещения, иначе - warning
+        
         # проставляем посещаемость
         googleSheetInfoArray[groups.index(group)].setAttendanceArrayByIndex(indexFIO)
         
@@ -578,9 +582,8 @@ def findNickFromGroupAndFIO(groups, googleSheetInfoArray, nick):
         else:
             return '', googleSheetInfoArray
 
-    
-     # преобразум все индексы ФИО в ФИО
-    results=changeIndexOfFIOsResultToFIOs(groups, results, googleSheetInfoArray)    
+    for indexResult in range(len(results)):
+        results[indexResult]=changeIndexOfFIOsResultToFIOs(groups, results[indexResult], googleSheetInfoArray)    
     print(results)    
     
     # если не найдено совпадений
@@ -671,10 +674,6 @@ def getAndSetGoogleSheet(date, nicks):
     # DELETE получаем группы
     groups=['в4933', '4933']
     
-    # сортируем группы по длине строки, начиная от большей строки (иначе если будут группы M911 и 911,
-    # то для 'Петров M911' если 911 первее - то будет ошибочно воспринято, что Петров из 911 группы)
-    groups=groups.sort(key=sortByLength, reverse=True)
-    
     # Получаем массив данных по дате:
     googleSheetInfoArray=parseGoogleSheet(date, groups)
     
@@ -688,16 +687,49 @@ def getAndSetGoogleSheet(date, nicks):
     return resultErrorsAndWarnings
     
 
+#Not unique by qroups -----------
+#groups=['в4933', '4933']
 
-groups=['в4933', '4933']
+#googleSheetInfoArray=[]
+#googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Семенов', 'Павел', 'Александрович']], [0, 0]))
+
+#googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Андрвей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 0]))
+#nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игор4933']
+
+# Not Unique and not unique by qroups - check only situation, when not unique (it's worse)-----------------
+#groups=['в4933', '4933']
+
+#googleSheetInfoArray=[]
+#googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Петров', 'Андрей', 'Владимирович']], [0, 0]))
+
+#googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Андрвей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 0]))
+#nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игор4933']
+
+# bad group  ----------------------
+#groups=['г4933', 'д4933']
+
+#googleSheetInfoArray=[]
+#googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Петров', 'Андрей', 'Владимирович']], [0, 0]))
+
+#googleSheetInfoArray.append(GoogleSheetInfo('д4933', ['A', 1], [['Петров', 'Андрвей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 0]))
+#nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игорд4933']
+
+
+# not exist  ----------------------
+#groups=['д4933', 'в4933']
 
 googleSheetInfoArray=[]
-googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Семенов', 'Павел', 'Александрович']], [0, 0]))
+googleSheetInfoArray.append(GoogleSheetInfo('д4933', ['A', 1], [['Петров', 'Андрей', 'Владимирович'], ['Петров', 'Андрей', 'Владимирович']], [0, 0]))
 
-googleSheetInfoArray.append(GoogleSheetInfo('4933', ['A', 1], [['Петров', 'Андрвей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 0]))
+googleSheetInfoArray.append(GoogleSheetInfo('в4933', ['A', 1], [['Петров', 'Андрвей', 'Владимирович'], ['Коваленко', 'Игорь']], [0, 0]))
+nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игорв4933']
+
+# !!! Порядок group Четко соответствует порядку Google Sheet (это будет автоматически реализовано при считывании)
+
+
+
 
 #nicks=['dfв@49#3$3№петров андрей владимирович', 'игор4933']
-nicks=['ПетровАндрdfв@49#3$3№ейВлад23432имирович', 'игор4933']
 #nicks=['dfв@49#3$3№петровАндрейВладимирович', 'игор4933']
 #nicks=['Петров Андрей в4933', 'игор4933']
 # проставляем посещаемость по никнеймам
