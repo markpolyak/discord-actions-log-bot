@@ -17,15 +17,16 @@ import googleSheetDefault
 # - то мы не можем воспринять, что это Петров А. В.
 # Алгоритм пытается соотнести содержимое никнейма и результата
   
-        
+Static_Variants=[1, 2, 3, 4] 
+ 
 # Класс, определяющий парсинг информации с гугл sheet
 class GoogleSheetInfo:
     
     def __init__(self, group, positionInGoogleList, arrayOfPartsFIOs, attendanceArray):
         self.__group = group # example: '4933'
-        self.__positionInGoogleList = positionInGoogleList # position in google Sheet - example: [A, 0] or [0, 0]
-        self.__arrayOfPartsFIOs = arrayOfPartsFIOs
-        self.__attendanceArray = attendanceArray
+        self.__positionInGoogleList = positionInGoogleList # horizontal position in google Sheet - example: 15
+        self.__arrayOfPartsFIOs = arrayOfPartsFIOs # array of FIO from group (FIO in array too)
+        self.__attendanceArray = attendanceArray # attendance for group - array like: [0, 0, 1, 1, 0]
         
     
     def getGroup(self):
@@ -64,14 +65,10 @@ class GoogleSheetInfo:
     def setAttendanceArrayByIndex(self, index, attendanceArrayElement=1):
         if index in range(len(self.__attendanceArray)):
             self.__attendanceArray[index] = attendanceArrayElement
- 
-
-# special variants, which is not similar in lower in upper  
-exceptionsFromEngToRus=['t', 'b','r']
 
 # defaul variants, which is similar in lower and in upper? or only an upper (for exceptions variants) 
-fromEngToRusDefault={'K':'К', 'M':'М', 'E':'Е', 'C':'С', 'X':'Х', 'Y':'У', 'O':'О', 'A':'А', 'T':'Т', 'B':'В', 'P':'Р',
-'k':'к', 'm':'м', 'e':'е', 'c':'с', 'x':'х', 'y':'у', 'o':'о', 'a':'а'}
+fromEngToRusDefault={'K':'К', 'M':'М', 'E':'Е', 'C':'С', 'X':'Х', 'Y':'У', 'O':'О', 'A':'А', 'T':'Т', 'B':'В', 'P':'Р', 'H':'Н',
+'k':'к', 'm':'м', 'e':'е', 'c':'с', 'x':'х', 'y':'у', 'o':'о', 'a':'а', 'p':'р'}
 
 # symbols, which need to be converted
 convertSymb={'Ё':'Е', 'ё':'е'} # 'Й':'И', 'й':'и'
@@ -81,6 +78,7 @@ class variantsOfAlgoritm(enum.Enum):
         withSpace = 1 # приводим к пробелам
         withUpperBegin = 2 # приводим к верхнему регистру начало
         withUpperBeginAndLowerAnother = 3 # приводим к верхнему регистру начало, остальное к нижнему
+        withConvertToRussian = 4 # переводим все английские буквы в русские
 
 # we can choose only few of them
 dictVariantsOfAlgoritm = {
@@ -88,7 +86,13 @@ dictVariantsOfAlgoritm = {
     1 : [variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBegin],
     2 : [variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBeginAndLowerAnother],
     3 : [variantsOfAlgoritm.withUpperBegin],
-    4 : [variantsOfAlgoritm.withUpperBeginAndLowerAnother]
+    4 : [variantsOfAlgoritm.withUpperBeginAndLowerAnother],
+    5 : [variantsOfAlgoritm.withConvertToRussian],
+    6 : [variantsOfAlgoritm.withConvertToRussian, variantsOfAlgoritm.withSpace],
+    7 : [variantsOfAlgoritm.withConvertToRussian, variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBegin],
+    8 : [variantsOfAlgoritm.withConvertToRussian, variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBeginAndLowerAnother],
+    9 : [variantsOfAlgoritm.withConvertToRussian, variantsOfAlgoritm.withUpperBegin],
+    10 : [variantsOfAlgoritm.withConvertToRussian, variantsOfAlgoritm.withUpperBeginAndLowerAnother]
 }       
 
 # State of successful result
@@ -236,8 +240,21 @@ class GoogleSheetParser:
 
     # приводим к нижнему регистру и к английскому алфавиту подобные
     def _toGroupStandartSymb(self, symbGroup):
-        if symbGroup in exceptionsFromEngToRus:
-           return symbGroup.upper()
+        # to Up register   
+        symbGroup = symbGroup.upper()
+        if symbGroup in fromEngToRusDefault:
+            return fromEngToRusDefault[symbGroup].upper()
+        else:
+            return symbGroup.upper()
+    
+    def _fromEnglishToRussianName(self, name):
+        newName=''
+        for index in range(len(name)):
+            if name[index] in fromEngToRusDefault:
+                newName+=fromEngToRusDefault[name[index]]
+            else:
+                newName+=name[index]
+        return newName
         
         # to Up register   
         symbGroup = symbGroup.upper()
@@ -246,7 +263,8 @@ class GoogleSheetParser:
         else:
             return symbGroup
     
-    # Конвертация русских символов
+    
+    # Конвертация русских символов - ё, й
     def _convertSymb(self, name):
         newName=''
         for index in range(len(name)):
@@ -335,7 +353,7 @@ class GoogleSheetParser:
         
     # получить группу из имени          
     # на вход - получаем стандартную группу, nick и nick без спец. символов, массив соответствия индексов последних двух
-    def _getNickWthoutGroupFromNick(self, group, nick, parseNick, indices):  
+    def _getNickWthoutGroupFromNick(self, group, nick, parseNick, indices):
         # получаем индекс начала для группы - группа обязательно должна содержать числа, иначе может возникнуть очень много неточностей парсинга
         startDigitGroup=self._getIndexFirstDigit(group)
         if (startDigitGroup<0):
@@ -453,7 +471,10 @@ class GoogleSheetParser:
     # Функция, которая пытается найти сопоставления путем приведения к Верхнему регистру начальных символов,
     # остальных к нижнему регистру, а также путем дальнейшего удаления знаков
     def _getPartsFormNickAlgoritm(self, nick, variants):
-         # приводим к пробелам все знаки
+        # приводим к русскому языку подобные английские символы
+        if variantsOfAlgoritm.withConvertToRussian in variants:
+            nick=self._fromEnglishToRussianName(nick)
+        # приводим к пробелам все знаки
         if variantsOfAlgoritm.withSpace in variants:
             nick=self._turnToSpacesSigns(nick)
         # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
@@ -462,7 +483,6 @@ class GoogleSheetParser:
         # все символы начала приводим к верхнему регистру (т.е. после пробелов), остальные к нижнему
         elif variantsOfAlgoritm.withUpperBegin in variants:
             nick=self._beginOfWordToUpRegister(nick)  
-
         # Получаем составные части никнейма
         return self._parseNameToParts(nick)
        
@@ -539,7 +559,7 @@ class GoogleSheetParser:
         # пробегаемся по всем вариантам словаря
         for variantIndex in range(len(dictVariantsOfAlgoritm)):
             nickArr = self._getPartsFormNickAlgoritm(parseNick, dictVariantsOfAlgoritm[variantIndex])
-
+            print(nickArr)
             # если количество элементов, полученных из ника слишком большое или слишком малое
             if (len(nickArr)>3 or len(nickArr)<1):
                 continue
@@ -771,6 +791,15 @@ class GoogleSheetParser:
             return self.__dictResultToMessage(), self.__resultWarnings, self.__resultErrors
          
 # загрузка никнеймов с текстового документа для тестировки
+nicks=['Пeтpoв32432Aндрей@49#3$3№32432ВлаДимИрович']
+googleSheetParser=GoogleSheetParser()
+print(nicks)
+messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('17.06', nicks)
+
+
+print(messageResult)
+print(resWarnings)
+print(resErrors)
 """
 Name_File = 'test.txt'  
 def getNicksFromFile(nameFile):
