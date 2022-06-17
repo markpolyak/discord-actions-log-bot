@@ -139,15 +139,15 @@ class GoogleSheet:
                     datesattendance - array of arrays of all dates in every sheet
         
         """
-        startattendance=[]
-        datesattendance=[]
+        startAttendance=[]
+        datesAttendance=[]
         index=0
         for data in multiple_sheets_data:
             index+=1
 
         for indexSheet in range(len(sheets)):
 
-            datesattendance.append([])
+            datesAttendance.append([])
             sheetData=multiple_sheets_data[sheets[indexSheet]]
             
 
@@ -161,16 +161,18 @@ class GoogleSheet:
                 if (isattendance):
                     if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self._row_start_date_attendance])!=None): 
                         # set exist date
-                        datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])
+                        datesAttendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])
                     else:
                         break 
                 # if wind key-word - is start of attendance
                 elif (sheetData[indexCol][self._row_start_name_attendance]==googleSheetSettings.name_of_attendance):
-                    startattendance.append(indexCol)
+                    startAttendance.append(indexCol)
                     isattendance=True
                     # set exist date
-                    datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])             
-        return (startattendance, datesattendance)
+                    datesAttendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])    
+            if (len(startAttendance)<len(datesAttendance)):
+                startAttendance.append(-1)
+        return (startAttendance, datesAttendance)
     
     def _find_FIOs(self, sheets, multiple_sheets_data):
         """
@@ -222,7 +224,6 @@ class GoogleSheet:
         """
 
         colPositionDates = []
-        
         for indexSheet in range(len(sheets)):
             colDate=self._get_col_date(date, dates[indexSheet], startDates[indexSheet])
                         # if date not exist for group
@@ -269,7 +270,6 @@ class GoogleSheet:
         :returns: array of attendance, converted to length of lenArray
         """
         convertAttendances=[]
-
         for indexSheet in range(len(lenArray)):        
             convertAttendanceSheet = [0]*lenArray[indexSheet]
             for index in range(len(attendances[indexSheet])):
@@ -332,31 +332,22 @@ class GoogleSheet:
         # get all sheets
         # sheets are equal groups
         sheets=self._get_sheet_names()
-
         # get all info in every sheet
         result = self._get_multiple_sheets_data(sheets)
-        
         # get start position of dates and attendance, and also dates
         startAttendance, datesAttendance = self._find_dates_and_ranges_attendance(sheets, result)
-        
         # get horizontal position of date for attandance for all sheets
-        colPositionDates = self._get_all_col_dates(date, datesAttendance, startAttendance, sheets)
-        
+        colPositionDates = self._get_all_col_dates(date, datesAttendance, startAttendance, sheets)      
         # Convert to actual info
         sheets = self._dropInfoWthoutDate(sheets, colPositionDates)
-        colPositionDates = self._dropInfoWthoutDate(colPositionDates, colPositionDates)  
-        
+        colPositionDates = self._dropInfoWthoutDate(colPositionDates, colPositionDates)      
         # get FIOs for every sheet
         FIOs = self._find_FIOs(sheets, result)
-
         lenArray = self._getSizeOfArraysInArray(FIOs)
-
         # get attandances for every sheet
-        attendances = self._get_attendances(colPositionDates, sheets, result)
-        
+        attendances = self._get_attendances(colPositionDates, sheets, result)  
         # get convert attendances for every sheet        
         attendances = self._convert_attendances_to_standart(attendances, lenArray)
-        
         return (sheets, colPositionDates, FIOs, attendances)
 
 
