@@ -134,7 +134,15 @@ class LogClient(discord.Client):
                 await message.channel.send("Can't update google sheet")
             else:
                 await message.channel.send(totalResult)
-                
+            result=('\n'.join(totalErrorsDiscord)+'\n' if len(totalErrorsDiscord)>0 else '') + \
+                    ('\n'.join(totalErrors)+'\n' if len(totalErrors)>0 else '') + \
+                    ('\n'.join(totalWarnings)+'\n' if len(totalWarnings)>0 else '') +\
+                    ('\n'.join(totalInfo) if len(totalInfo)>0 else '')
+            # name of File
+            filename = f"result--{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.txt" 
+            if (result!=''):
+                await message.channel.send(
+                    file=File(io.StringIO(result), filename=filename))   
             
 
 
@@ -245,10 +253,7 @@ class LogQuery:
             channel_name = items[0].strip()
             date_start = datetime.fromisoformat(items[1].strip()).astimezone()
             date_end = datetime.fromisoformat(items[2].strip()).astimezone()
-            if len(items) > 3:
-                output_type = items[3].strip() 
-            else:
-                output_type ='txt'
+            output_type = items[3].strip() if len(items) > 3 else 'txt'
         except Exception as ex:
             raise Exception("Wrong format of message try to use this format: {name channel}, yyyy-mm-dd hh:mm, yyyy-mm-dd hh:mm, {file format}}")
         print(channel_name)
