@@ -72,6 +72,9 @@ exceptionsFromEngToRus=['t', 'b','r']
 # defaul variants, which is similar in lower and in upper? or only an upper (for exceptions variants) 
 fromEngToRusDefault={'K':'К', 'M':'М', 'E':'Е', 'C':'С', 'X':'Х', 'Y':'У', 'O':'О', 'A':'А', 'T':'Т', 'B':'В', 'P':'Р'}
 
+# symbols, which need to be converted
+convertSymb={'Ё':'Е', 'ё':'е'} # 'Й':'И', 'й':'и'
+
 # класс перечислений вариантов алгоритма
 class variantsOfAlgoritm(enum.Enum):
         withSpace = 1 # приводим к пробелам
@@ -134,11 +137,10 @@ class GoogleSheetParser:
     def _clearDictResult(self):
         for result in self.__dictResult:
             self.__dictResult[result] = 0
-
+    
     # инкрементация результата
     def _incDictResult(self, result):
         if (result in [successState.SuccessfulCompare, warningState.CompareButNotEqual]):
-            print('0')
             self.__dictResult['updated']+=1
         elif (result == warningState.AlreadySetAtendance):
 
@@ -202,21 +204,21 @@ class GoogleSheetParser:
 
     # привести к пробелам знаки
     def _turnToSpacesSigns(self, stroka):
-        return re.sub(r'[^a-zA-Zа-яА-Я]', " ",  stroka)
+        return re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', " ",  stroka)
         
     # удаляем все, кроме букв, чисел
     def _delSigns(self, stroka):
-        return re.sub(r'[^a-zA-Zа-яА-Я0-9]', "",  stroka)
+        return re.sub(r'[^a-zA-Zа-яА-ЯёЁ0-9]', "",  stroka)
 
 
     # заменяем все на русские буквы и пробелы
     # Петров А.В. -> ПетровАВ
     def _turnToSpacesAllWthoutName(self, stroka):
-        return re.sub(r'[^а-яА-Я\s]', " ",  stroka)
+        return re.sub(r'[^а-яА-ЯёЁ\s]', " ",  stroka)
 
     # оставляем только буквы русского алфавита
     def _delAllWthoutName(self, stroka):
-        return re.sub(r'[^а-яА-Я]', "",  stroka)    
+        return re.sub(r'[^а-яА-ЯёЁ]', "",  stroka)    
 
     # получить индекс первого числа в строке
     def _getIndexFirstDigit(self, stroka, startPosition = 0):
@@ -242,7 +244,18 @@ class GoogleSheetParser:
             return fromEngToRusDefault[symbGroup]
         else:
             return symbGroup
-        
+    
+    # Конвертация русских символов
+    def _convertSymb(self, name):
+        newName=''
+        for index in range(len(name)):
+            if name[index] in convertSymb:
+                newName+=convertSymb[name[index]]
+            else:
+                newName+=name[index]
+        return newName
+            
+    
     # сравниваем формат символов и их значения - для всех символов группы
     def _compareFormatSymb(self, group, groupNick):
         # если размеры не равны
@@ -290,22 +303,23 @@ class GoogleSheetParser:
 
         
     # получаем составные части    
-    def _parseNameToParts(self, stroka):
+    def _parseNameToParts(self, name):
         # убираем все символы, кроме ФИО (пробелы также удаляются)
-        stroka=self._delAllWthoutName(stroka)
+        name=self._delAllWthoutName(name)
+        name=self._convertSymb(name)
         # парсим и получаем части ФИО
-        parseArr=[stroka[0].upper()]
+        parseArr=[name[0].upper()]
         currentName=0
-        for index in range(1, len(stroka)):
+        for index in range(1, len(name)):
             # если в верхнем регистре
-            if (stroka[index].upper()==stroka[index]):
+            if (name[index].upper()==name[index]):
                 #добавляем в конец
-                parseArr.append(stroka[index])
+                parseArr.append(name[index])
                 # текущий индекс - следующий
                 currentName+=1
             else:
                 #добавляем в конец текущего - нет смысла в lower
-                parseArr[currentName]+=stroka[index]
+                parseArr[currentName]+=name[index]
         return parseArr
         
     # получить массив нумерации массива по индексам без пробелов относительно начального     
@@ -524,6 +538,7 @@ class GoogleSheetParser:
         # пробегаемся по всем вариантам словаря
         for variantIndex in range(len(dictVariantsOfAlgoritm)):
             nickArr = self._getPartsFormNickAlgoritm(parseNick, dictVariantsOfAlgoritm[variantIndex])
+
             # если количество элементов, полученных из ника слишком большое или слишком малое
             if (len(nickArr)>3 or len(nickArr)<1):
                 continue
@@ -658,7 +673,6 @@ class GoogleSheetParser:
 
     def _convertFIOsToPartFIOs(self, FIOs):
         for index in range(len(FIOs)):
-
             FIOs[index]=self._parseNameToParts(FIOs[index])
         return FIOs
 
@@ -727,7 +741,7 @@ class GoogleSheetParser:
         #print(len(self.__googleSheetInfoArray))
         #for element in self.__googleSheetInfoArray:
         #    print(element.getGroup())
-        #    print(element.getAtendanceArray())        
+        #    print(element.getPositionInGoogleList())        
         #    print(element.getArrayOfPartsFIOs())
         #    print(element.getAtendanceArray())    
             
@@ -740,20 +754,30 @@ class GoogleSheetParser:
         
         atendances=self._getAtendancesForGoogleSheet()      
         
-        result, sendErrors = googleSheet.setAllAtendancesSheet(groups, startAtendances, atendances)
         
+        result, sendErrors = googleSheet.setAllAtendancesSheet(groups, startAtendances, atendances)
+        #print(groups)
+       # print(startAtendances)
+        #print(atendances)
         # объединяем списки ошибок
         self.__resultErrors+=sendErrors
         
         return result, self.__dictResultToMessage(), self.__resultWarnings, self.__resultErrors
-            
 
+Name_File = 'test.txt'           
+# загрузка никнеймов с текстового документа для тестировки
+def getNicksFromFile(nameFile):
+    with open(nameFile, encoding='utf-8') as file:
+        nicks = [row.strip() for row in file]
+    while '' in nicks:
+        nicks.remove('')
+    return nicks
+      
+# get nicks from file
+nicks=getNicksFromFile(Name_File)
 
 googleSheetParser=GoogleSheetParser()
-
-# DELETE NICKS, BUT ON DISCORD STAGE
-nicks=['ПетровАндрdfB@49#3$3№ейВлад23432имирович', 'игор4933', 'русакова дарья 4933', '4933останин']
-
+print(nicks)
 result, messageResult, resWarnings, resErrors = googleSheetParser.setAtendanceFromNicksToGoogleSheet('09.04', nicks)
 
 print(result)
