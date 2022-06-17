@@ -42,7 +42,6 @@ class GoogleSheet:
         """
         Performs authentication and creates a service.spreadsheets() instance
         
-        :returns: service.spreadsheets() instance
         """
         creds = None
         # The file token.pickle stores the user's access and refresh tokens, and is
@@ -73,7 +72,6 @@ class GoogleSheet:
         """
         Get all sheet names that are present on the spreadsheet
         
-        :param __spreadsheet: a service.__spreadsheets() instance
         :returns: list with sheet names
         """
         sheets = []
@@ -82,6 +80,27 @@ class GoogleSheet:
             sheets.append(s.get('properties', {}).get('title'))
         return sheets
 
+    def _getBatchRange(self, nameSheet):
+        """
+        Convert nameSheet to Range.
+        Need to solve the problem, when range convert in form: '4931!M911', which is not correct
+        
+        :param nameSheet: current name of sheet
+        :returns: range from sheet in form 'M911' -> 'M911!A1:AJ1000'
+        """
+        return str(nameSheet)+'!A1:AJ1000'
+
+    def _getBatchRanges(self, arrNameSheet):
+        """
+        Get ranges for list for all arrNameSheet
+        
+        :param arrNameSheet: array of names of all sheets
+        :returns: array of ranges for all sheets to get request
+        """
+        arrBatchRanges=[]
+        for nameSheet in arrNameSheet:
+            arrBatchRanges.append(self._getBatchRange(nameSheet))
+        return arrBatchRanges
 
     def _get_multiple_sheets_data(self, sheets, dimension='COLUMNS'):
         """
@@ -93,12 +112,20 @@ class GoogleSheet:
         :returns: dict with sheet name as key and data as value
         """
         data = {}
-        request = self.__spreadsheet.values().batchGet(spreadsheetId=googleSheetSettings.google_spreadsheet_id, ranges=sheets, majorDimension=dimension)
+        arrBatchRanges = self._getBatchRanges(sheets)
+        
+        request = self.__spreadsheet.values().batchGet(spreadsheetId=googleSheetSettings.google_spreadsheet_id, ranges=arrBatchRanges, majorDimension=dimension)
         response = request.execute()
         for i in range(0, len(response.get('valueRanges'))):
-            data[sheets[i]] = response.get('valueRanges')[i].get('values')
+            data[str(sheets[i])] = response.get('valueRanges')[i].get('values')
         return data
-      
+      #for sheet in sheets:
+            
+      #      request = self.__spreadsheet.values().batchGet(spreadsheetId=googleSheetSettings.google_spreadsheet_id, ranges=str(sheet)+'!A1:AJ1000', majorDimension=dimension)
+      #      response = request.execute()
+       #     print(response.get('valueRanges')[0])
+       #     data[sheet] = response.get('valueRanges')[0].get('values')
+      #  return data
 
       
     def _find_dates_and_ranges_atendance(self, sheets, multiple_sheets_data):
@@ -114,11 +141,16 @@ class GoogleSheet:
         """
         startatendance=[]
         datesatendance=[]
+        index=0
+        for data in multiple_sheets_data:
+            index+=1
+
         for indexSheet in range(len(sheets)):
 
             datesatendance.append([])
             sheetData=multiple_sheets_data[sheets[indexSheet]]
             
+
             # flag of atendance
             isatendance=False
             for indexCol in range(len(sheetData)):
@@ -417,9 +449,10 @@ class GoogleSheet:
         """
         isSendSomething=False
         sendErrors = []
+
         for index in range(len(sheets)):
             if (len(atendances[index])>0):
-                try:
+                try:             
                     if (self._updateAttendanseSheet(sheets[index], 
                         colPositionDate[index], 
                         self._row_start_date_atendance+self._shift_rows+1, 
@@ -433,4 +466,12 @@ class GoogleSheet:
             else:
                 # we can check this, where we get info - but in main fuction we couldn't find man with empty group (it can help to teacher)
                 sendErrors.append['For group ' + sheets[index] + ' length of atendance equal zero']      
-            return isSendSomething, sendErrors
+        return isSendSomething, sendErrors
+            
+#googleSheet=GoogleSheet()    
+#sheets, colPositionDates, FIOs, atendance=googleSheet.getGoogleSheetInfoByDate('09.04')
+#print(sheets)
+#print(colPositionDates)
+#print(FIOs)
+#print(atendance)
+     
