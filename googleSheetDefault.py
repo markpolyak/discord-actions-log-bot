@@ -14,11 +14,11 @@ class GoogleSheet:
     # We need write access to the __spreadsheet: https://developers.google.com/sheets/api/guides/authorizing
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-    # row, where start name atendance
-    _row_start_name_atendance=0
+    # row, where start name attendance
+    _row_start_name_attendance=0
 
     # row, where start date
-    _row_start_date_atendance=1
+    _row_start_date_attendance=1
 
     # col where start FIOs
     _col_start_FIOs=1
@@ -128,49 +128,49 @@ class GoogleSheet:
       #  return data
 
       
-    def _find_dates_and_ranges_atendance(self, sheets, multiple_sheets_data):
+    def _find_dates_and_ranges_attendance(self, sheets, multiple_sheets_data):
         """
         Get range array of start and end position lectures for every sheet
         Get array of dates lectures for every sheet
         
         :param sheets: a list of sheet names for which the data is to be retrieved
         :param multiple_sheets_data: a list of data for every sheet in sheets
-        :returns:   startatendance - array of horizontal position, where dates start
-                    datesatendance - array of arrays of all dates in every sheet
+        :returns:   startattendance - array of horizontal position, where dates start
+                    datesattendance - array of arrays of all dates in every sheet
         
         """
-        startatendance=[]
-        datesatendance=[]
+        startattendance=[]
+        datesattendance=[]
         index=0
         for data in multiple_sheets_data:
             index+=1
 
         for indexSheet in range(len(sheets)):
 
-            datesatendance.append([])
+            datesattendance.append([])
             sheetData=multiple_sheets_data[sheets[indexSheet]]
             
 
-            # flag of atendance
-            isatendance=False
+            # flag of attendance
+            isattendance=False
             for indexCol in range(len(sheetData)):
                 # if not enough rows
-                if (len(sheetData[indexCol])-1<self._row_start_date_atendance):
+                if (len(sheetData[indexCol])-1<self._row_start_date_attendance):
                     continue
                     
-                if (isatendance):
-                    if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self._row_start_date_atendance])!=None): 
+                if (isattendance):
+                    if (re.search(r'^[0-3][0-9]\.[0-1][0-9]$', sheetData[indexCol][self._row_start_date_attendance])!=None): 
                         # set exist date
-                        datesatendance[indexSheet].append(sheetData[indexCol][self._row_start_date_atendance])
+                        datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])
                     else:
                         break 
-                # if wind key-word - is start of atendance
-                elif (sheetData[indexCol][self._row_start_name_atendance]==googleSheetSettings.name_of_atendance):
-                    startatendance.append(indexCol)
-                    isatendance=True
+                # if wind key-word - is start of attendance
+                elif (sheetData[indexCol][self._row_start_name_attendance]==googleSheetSettings.name_of_attendance):
+                    startattendance.append(indexCol)
+                    isattendance=True
                     # set exist date
-                    datesatendance[indexSheet].append(sheetData[indexCol][self._row_start_date_atendance])             
-        return (startatendance, datesatendance)
+                    datesattendance[indexSheet].append(sheetData[indexCol][self._row_start_date_attendance])             
+        return (startattendance, datesattendance)
     
     def _find_FIOs(self, sheets, multiple_sheets_data):
         """
@@ -230,64 +230,64 @@ class GoogleSheet:
             colPositionDates.append(colDate)
         return colPositionDates
 
-    def _get_atendances(self, colPositionDates, sheets, multiple_sheets_data):
+    def _get_attendances(self, colPositionDates, sheets, multiple_sheets_data):
         """
-        Get array of atendance for All date and sheet
+        Get array of attendance for All date and sheet
         
         :param colPositionDates: col date position in googleSheet for all sheets
         :param sheets: a list of sheet names for which the data is to be retrieved
         :param multiple_sheets_data: a list of data for every sheet in sheets
-        :returns: array of atendance for all sheets, which we have
+        :returns: array of attendance for all sheets, which we have
         """
         
-        atendances=[]
+        attendances=[]
         for indexSheet in range(len(sheets)):
             # get sheet Data by name Sheet
             sheetData=multiple_sheets_data[sheets[indexSheet]]
             
             # get col with attandance Data
-            atendanceSheet=sheetData[colPositionDates[indexSheet]]
+            attendanceSheet=sheetData[colPositionDates[indexSheet]]
             # delete upper rows, which dont have info about attandance
-            for index in range(0, self._row_start_date_atendance+1):
-                if (len(atendanceSheet)<=0):
+            for index in range(0, self._row_start_date_attendance+1):
+                if (len(attendanceSheet)<=0):
                     break;
-                del atendanceSheet[0]
+                del attendanceSheet[0]
             
-            # delete not used info in bottom isn't necessary - check fucntion - _convert_atendances_to_standart  
+            # delete not used info in bottom isn't necessary - check fucntion - _convert_attendances_to_standart  
                 
             # save attandance without upper rows
-            atendances.append(atendanceSheet)
+            attendances.append(attendanceSheet)
 
-        return atendances
+        return attendances
         
-    def _convert_atendances_to_standart(self, atendances, lenArray):
+    def _convert_attendances_to_standart(self, attendances, lenArray):
         """
-        Convert atendances to similar size with equal by index element in lenArray
+        Convert attendances to similar size with equal by index element in lenArray
         
-        :param atendances: array of non convert atendance for ALL sheets
+        :param attendances: array of non convert attendance for ALL sheets
         :param lenArray: FIO arrays for ALL sheets 
-        :returns: array of atendance, converted to length of lenArray
+        :returns: array of attendance, converted to length of lenArray
         """
-        convertAtendances=[]
+        convertAttendances=[]
 
         for indexSheet in range(len(lenArray)):        
-            convertAtendanceSheet = [0]*lenArray[indexSheet]
-            for index in range(len(atendances[indexSheet])):
+            convertAttendanceSheet = [0]*lenArray[indexSheet]
+            for index in range(len(attendances[indexSheet])):
                 if (index>=lenArray[indexSheet]):
                     break
                 # set value only for 1
-                if (atendances[indexSheet][index]=='1'):
-                    convertAtendanceSheet[index]=1
+                if (attendances[indexSheet][index]=='1'):
+                    convertAttendanceSheet[index]=1
             
-            convertAtendances.append(convertAtendanceSheet)   
+            convertAttendances.append(convertAttendanceSheet)   
         
-        return convertAtendances
+        return convertAttendances
     
     def _dropInfoWthoutDate(self, infoArray, colPositionDates):
         """
         Delete all coloumns in infoArray where for current index not exist horizontal position of the date in colPositionDates
         
-        :param infoArray: array of info, like arr of groups or array of arrays FIO or atendance
+        :param infoArray: array of info, like arr of groups or array of arrays FIO or attendance
         :param colPositionDates: array of horizontal position of the date - if not exist, than have value -1
         :returns: array with remove cols from infoArray, which have by index in colPositionDates value -1
         """
@@ -305,7 +305,7 @@ class GoogleSheet:
         
         !Attention: Not correct result if not array (if string, int...)
         
-        :param infoArray: array of info, like arr of groups or array of arrays FIO or atendance
+        :param infoArray: array of info, like arr of groups or array of arrays FIO or attendance
         :returns: array of sizes elements (arrays) in infoArray 
         """   
     
@@ -325,8 +325,8 @@ class GoogleSheet:
         :param FIOs: FIO arrays for ALL sheets 
         :returns:   sheets - names of all sheets (equal groups)
                     FIOs - array of array FIO for every group
-                    colPositionDates - array of horizontal position of the date and Atendances
-                    atendances - array of array atendances for avery group              
+                    colPositionDates - array of horizontal position of the date and Attendances
+                    attendances - array of array attendances for avery group              
         """
         
         # get all sheets
@@ -336,11 +336,11 @@ class GoogleSheet:
         # get all info in every sheet
         result = self._get_multiple_sheets_data(sheets)
         
-        # get start position of dates and atendance, and also dates
-        startAtendance, datesAtendance = self._find_dates_and_ranges_atendance(sheets, result)
+        # get start position of dates and attendance, and also dates
+        startAttendance, datesAttendance = self._find_dates_and_ranges_attendance(sheets, result)
         
         # get horizontal position of date for attandance for all sheets
-        colPositionDates = self._get_all_col_dates(date, datesAtendance, startAtendance, sheets)
+        colPositionDates = self._get_all_col_dates(date, datesAttendance, startAttendance, sheets)
         
         # Convert to actual info
         sheets = self._dropInfoWthoutDate(sheets, colPositionDates)
@@ -352,17 +352,17 @@ class GoogleSheet:
         lenArray = self._getSizeOfArraysInArray(FIOs)
 
         # get attandances for every sheet
-        atendances = self._get_atendances(colPositionDates, sheets, result)
+        attendances = self._get_attendances(colPositionDates, sheets, result)
         
-        # get convert atendances for every sheet        
-        atendances = self._convert_atendances_to_standart(atendances, lenArray)
+        # get convert attendances for every sheet        
+        attendances = self._convert_attendances_to_standart(attendances, lenArray)
         
-        return (sheets, colPositionDates, FIOs, atendances)
+        return (sheets, colPositionDates, FIOs, attendances)
 
 
 
     # get standart print of range
-    def getRange(self, nameSheet, startCol, startRow, endCol, endRow):
+    def _getRange(self, nameSheet, startCol, startRow, endCol, endRow):
         """
         Get range of region for sending info to google sheet
         
@@ -392,7 +392,7 @@ class GoogleSheet:
         return row
       
        
-    def _convertToSendAtendance(self, rowAtendanse):
+    def _convertToSendAttendance(self, rowAtendanse):
         """
         Get attandance in format to send - in col, without 0 (converted to '')
         
@@ -401,11 +401,11 @@ class GoogleSheet:
         :returns: data for sending in col format: [0, 1, 0] -> [[''],[1],['']]         
         """
         colAtendanse=[]
-        for atendance in rowAtendanse:
-            if (atendance==0):
+        for attendance in rowAtendanse:
+            if (attendance==0):
                 colAtendanse.append([''])   
             else:
-                colAtendanse.append([atendance])                
+                colAtendanse.append([attendance])                
         return colAtendanse
     
     
@@ -421,10 +421,10 @@ class GoogleSheet:
         
         :returns: count of updated cells (all of them, even not changed...)           
         """
-        atendanse=self._convertToSendAtendance(atendanse)
+        atendanse=self._convertToSendAttendance(atendanse)
         col=self._getColNameFromColInt(col)
         data = [{
-            'range': self.getRange(nameSheet, col, startRow, col, endRow),
+            'range': self._getRange(nameSheet, col, startRow, col, endRow),
             'values': atendanse
         }]
         body = {
@@ -436,13 +436,13 @@ class GoogleSheet:
 
         
        
-    def setAllAtendancesSheet(self, sheets, colPositionDate, atendances):
+    def setAllAttendancesSheet(self, sheets, colPositionDate, attendances):
         """
         Update region (which is atendanse) in google sheet for all sheets
         
         :param sheets: array of google sheet (equal group)
         :param colPositionDate: array of horizontal position of the atendanse for every sheet
-        :param atendances: array of attandance (which is array too) for every sheet (group)
+        :param attendances: array of attandance (which is array too) for every sheet (group)
         
         :returns:   isSendSomething - result of send (did we send somthing?)
                     sendErrors - log of errors, which we get, when send information
@@ -451,27 +451,27 @@ class GoogleSheet:
         sendErrors = []
 
         for index in range(len(sheets)):
-            if (len(atendances[index])>0):
+            if (len(attendances[index])>0):
                 try:             
                     if (self._updateAttendanseSheet(sheets[index], 
                         colPositionDate[index], 
-                        self._row_start_date_atendance+self._shift_rows+1, 
-                        self._row_start_date_atendance+self._shift_rows+len(atendances[index]), 
-                        atendances[index])>0):
+                        self._row_start_date_attendance+self._shift_rows+1, 
+                        self._row_start_date_attendance+self._shift_rows+len(attendances[index]), 
+                        attendances[index])>0):
                         isSendSomething=True                    
                     else:
-                        sendErrors.append["For unknown reasons we can't send atendance info to group" + sheets[index] + ' (zero updated)'] 
+                        sendErrors.append["For unknown reasons we can't send attendance info to group " + sheets[index] + ' (zero updated)'] 
                 except:
-                    sendErrors.append["For unknown reasons we can't send atendance info to group" + sheets[index] + " (can't connect to sheet)"] 
+                    sendErrors.append["For unknown reasons we can't send attendance info to group " + sheets[index] + " (can't connect to sheet)"] 
             else:
                 # we can check this, where we get info - but in main fuction we couldn't find man with empty group (it can help to teacher)
-                sendErrors.append['For group ' + sheets[index] + ' length of atendance equal zero']      
+                sendErrors.append['For group ' + sheets[index] + ' length of attendance equal zero']      
         return isSendSomething, sendErrors
             
 #googleSheet=GoogleSheet()    
-#sheets, colPositionDates, FIOs, atendance=googleSheet.getGoogleSheetInfoByDate('09.04')
+#sheets, colPositionDates, FIOs, attendance=googleSheet.getGoogleSheetInfoByDate('09.04')
 #print(sheets)
 #print(colPositionDates)
 #print(FIOs)
-#print(atendance)
+#print(attendance)
      
