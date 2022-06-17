@@ -70,7 +70,8 @@ class GoogleSheetInfo:
 exceptionsFromEngToRus=['t', 'b','r']
 
 # defaul variants, which is similar in lower and in upper? or only an upper (for exceptions variants) 
-fromEngToRusDefault={'K':'К', 'M':'М', 'E':'Е', 'C':'С', 'X':'Х', 'Y':'У', 'O':'О', 'A':'А', 'T':'Т', 'B':'В', 'P':'Р'}
+fromEngToRusDefault={'K':'К', 'M':'М', 'E':'Е', 'C':'С', 'X':'Х', 'Y':'У', 'O':'О', 'A':'А', 'T':'Т', 'B':'В', 'P':'Р',
+'k':'к', 'm':'м', 'e':'е', 'c':'с', 'x':'х', 'y':'у', 'o':'о', 'a':'а'}
 
 # symbols, which need to be converted
 convertSymb={'Ё':'Е', 'ё':'е'} # 'Й':'И', 'й':'и'
@@ -191,9 +192,9 @@ class GoogleSheetParser:
                 result+= " in group " +  self._getStringForErrorsAndWarnings(info[indexGroupFIO])
             return result
         elif (enumValue == errorState.NotExist):
-            return "Error: '" + nick + "' not Exist in google sheet;"
+            return "Error: nick '" + nick + "' not Exist in google sheet;"
         elif (enumValue == errorState.NotUnique):
-            return "Error: '" + nick + "' not unique in google sheet - in group " + self._getStringForErrorsAndWarnings(info)       
+            return "Error: nick '" + nick + "' not unique in google sheet - in group " + self._getStringForErrorsAndWarnings(info)       
         elif (enumValue == warningState.CompareButNotEqual):
             return "Warning: nick '" + nick + "' is short, but we find an unique - in group " + self._getStringForErrorsAndWarnings(info)
         elif (enumValue == warningState.AlreadySetAttendance):
@@ -768,24 +769,26 @@ class GoogleSheetParser:
             return result, self.__resultWarnings, self.__resultErrors
         else:
             return self.__dictResultToMessage(), self.__resultWarnings, self.__resultErrors
-
-#Name_File = 'test.txt'           
+         
 # загрузка никнеймов с текстового документа для тестировки
-#def getNicksFromFile(nameFile):
-#    with open(nameFile, encoding='utf-8') as file:
-#        nicks = [row.strip() for row in file]
-#    while '' in nicks:
-#        nicks.remove('')
-#    return nicks
-      
+"""
+Name_File = 'test.txt'  
+def getNicksFromFile(nameFile):
+    with open(nameFile, encoding='utf-8') as file:
+        nicks = [row.strip() for row in file]
+    while '' in nicks:
+        nicks.remove('')
+    return nicks
+     
 #get nicks from file
-#nicks=getNicksFromFile(Name_File)
+nicks=getNicksFromFile(Name_File)
 
-#googleSheetParser=GoogleSheetParser()
-#print(nicks)
-#messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('09.04', nicks)
+googleSheetParser=GoogleSheetParser()
+print(nicks)
+messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('09.04', nicks)
 
 
-#print(messageResult)
-#print(resWarnings)
-#print(resErrors)
+print(messageResult)
+print(resWarnings)
+print(resErrors)
+"""
