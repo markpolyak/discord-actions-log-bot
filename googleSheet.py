@@ -1,8 +1,8 @@
 import re
 import enum
 
+from googleSheetDefault import GoogleSheet
 import googleSheetDefault
-
 # Предусловия:
 # ФИО - каждая составляющая ФИО начинается с большой буквы, остальные маленькие
 # Нет чувствительности к отчеству (в случае, если нет инициалов)
@@ -21,11 +21,11 @@ import googleSheetDefault
 # Класс, определяющий парсинг информации с гугл sheet
 class GoogleSheetInfo:
     
-    def __init__(self, group, positionInGoogleList, arrayOfPartsFIOs, atendanceArray):
+    def __init__(self, group, positionInGoogleList, arrayOfPartsFIOs, attendanceArray):
         self.__group = group # example: '4933'
         self.__positionInGoogleList = positionInGoogleList # position in google Sheet - example: [A, 0] or [0, 0]
         self.__arrayOfPartsFIOs = arrayOfPartsFIOs
-        self.__atendanceArray = atendanceArray
+        self.__attendanceArray = attendanceArray
         
     
     def getGroup(self):
@@ -43,11 +43,11 @@ class GoogleSheetInfo:
         else:
             return ''
     
-    def getAtendanceArray(self):
-        return self.__atendanceArray    
+    def getAttendanceArray(self):
+        return self.__attendanceArray    
         
-    def getAtendanceArrayByIndex(self, index):
-        return self.__atendanceArray[index]    
+    def getAttendanceArrayByIndex(self, index):
+        return self.__attendanceArray[index]    
     
     def setGroup(self, group):
         self.__group = group
@@ -58,12 +58,12 @@ class GoogleSheetInfo:
     def setArrayOfPartsFIOs(self, arrayOfPartsFIOs):
         self.__arrayOfPartsFIOs = arrayOfPartsFIOs
     
-    def setAtendanceArray(self, atendanceArray):
-        self.__atendanceArray = atendanceArray
+    def setAttendanceArray(self, attendanceArray):
+        self.__attendanceArray = attendanceArray
 
-    def setAtendanceArrayByIndex(self, index, atendanceArrayElement=1):
-        if index in range(len(self.__atendanceArray)):
-            self.__atendanceArray[index] = atendanceArrayElement
+    def setAttendanceArrayByIndex(self, index, attendanceArrayElement=1):
+        if index in range(len(self.__attendanceArray)):
+            self.__attendanceArray[index] = attendanceArrayElement
  
 
 # special variants, which is not similar in lower in upper  
@@ -98,7 +98,7 @@ class successState(enum.Enum):
 class warningState(enum.Enum):
     CompareButNotEqual = 1 # мало информации, но уникален - Петров А или Петров, Петров А В, или Петров Андр
     # корректный вариант - Петров Андрей, Петров Андрей Владимирович
-    AlreadySetAtendance = 2 # уже стоит не 0 в google sheet
+    AlreadySetAttendance = 2 # уже стоит не 0 в google sheet
 
 # State of error result  
 class errorState(enum.Enum):
@@ -142,7 +142,7 @@ class GoogleSheetParser:
     def _incDictResult(self, result):
         if (result in [successState.SuccessfulCompare, warningState.CompareButNotEqual]):
             self.__dictResult['updated']+=1
-        elif (result == warningState.AlreadySetAtendance):
+        elif (result == warningState.AlreadySetAttendance):
 
             self.__dictResult['alreadyUpdated']+=1
         else:
@@ -196,8 +196,8 @@ class GoogleSheetParser:
             return "Error: '" + nick + "' not unique in google sheet - in group " + self._getStringForErrorsAndWarnings(info)       
         elif (enumValue == warningState.CompareButNotEqual):
             return "Warning: nick '" + nick + "' is short, but we find an unique - in group " + self._getStringForErrorsAndWarnings(info)
-        elif (enumValue == warningState.AlreadySetAtendance):
-            return "Warning: for nick '" + nick + "' atendance has been already set - in group " + self._getStringForErrorsAndWarnings(info)
+        elif (enumValue == warningState.AlreadySetAttendance):
+            return "Warning: for nick '" + nick + "' attendance has been already set - in group " + self._getStringForErrorsAndWarnings(info)
         else:
             return ''
 
@@ -557,9 +557,9 @@ class GoogleSheetParser:
         return errorState.NotExist, indexFIOs
 
     # функция, которая проставляет посещения
-    #def setActualAtendance(groups, group, self.__googleSheetInfoArray, indexFIO):
+    #def setActualAttendance(groups, group, self.__googleSheetInfoArray, indexFIO):
         # проставляем посещаемость
-    #    self.__googleSheetInfoArray[groups.index(group)].setAtendanceArrayByIndex(indexFIO)
+    #    self.__googleSheetInfoArray[groups.index(group)].setAttendanceArrayByIndex(indexFIO)
 
     # заменить в результате все индексы ФИО на ФИО
     def _changeIndexOfFIOsResultToFIOs(self, groups, result):
@@ -576,14 +576,14 @@ class GoogleSheetParser:
 
         
         
-    # from ['group', [fio, fio]] set atendance to self.__googleSheetInfoArray
-    def _setAtendanceByResult(self, groups, results):
+    # from ['group', [fio, fio]] set attendance to self.__googleSheetInfoArray
+    def _setAttendanceByResult(self, groups, results):
             group = results[0][0]
             indexFIO=results[0][1][0]
-            if (self.__googleSheetInfoArray[groups.index(group)].getAtendanceArrayByIndex(indexFIO)!=0):
+            if (self.__googleSheetInfoArray[groups.index(group)].getAttendanceArrayByIndex(indexFIO)!=0):
                 return False
             else:
-                self.__googleSheetInfoArray[groups.index(group)].setAtendanceArrayByIndex(indexFIO)  
+                self.__googleSheetInfoArray[groups.index(group)].setAttendanceArrayByIndex(indexFIO)  
                 return True
      
     # TODO пока что возвращаем, но возможно лучше здесь же проставлять посещаемость, записывать ошибки и предупреждения
@@ -626,11 +626,11 @@ class GoogleSheetParser:
         if (len(results)==1):      
             # проставляем посещаемость
             # если посещаемость уже была проставлена
-            if (self._setAtendanceByResult(groups, results) == False):
+            if (self._setAttendanceByResult(groups, results) == False):
                 results=self._changeIndexOfFIOsResultToFIOs(groups, results[0])
-                self.__resultWarnings.append(self._getErrorOrWarning(warningState.AlreadySetAtendance, nick, results))  
+                self.__resultWarnings.append(self._getErrorOrWarning(warningState.AlreadySetAttendance, nick, results))  
                 # increase result counter
-                self._incDictResult(warningState.AlreadySetAtendance)
+                self._incDictResult(warningState.AlreadySetAttendance)
             else:
                 # преобразум все индексы ФИО в ФИО
                 results=self._changeIndexOfFIOsResultToFIOs(groups, results[0])
@@ -677,16 +677,16 @@ class GoogleSheetParser:
         return FIOs
 
     # TODO функция формирования для группы объекта класса GoogleSheetInfo 
-    def _convertFromGoogleSheet(self, groups, startAtendances, arrayFIOs, atendances):
-        if (len(groups)!=len(startAtendances)
+    def _convertFromGoogleSheet(self, groups, startAttendances, arrayFIOs, attendances):
+        if (len(groups)!=len(startAttendances)
             or len(groups)!=len(arrayFIOs)
-            or len(groups)!=len(atendances)):
+            or len(groups)!=len(attendances)):
             self.__resultErrors.append("Data from google sheet is not correct - parts have different length!")
             return False
         # convert info:
         for index in range(len(groups)):     
             self.__googleSheetInfoArray.append(
-                GoogleSheetInfo(groups[index], startAtendances[index], self._convertFIOsToPartFIOs(arrayFIOs[index]), atendances[index]))
+                GoogleSheetInfo(groups[index], startAttendances[index], self._convertFIOsToPartFIOs(arrayFIOs[index]), attendances[index]))
         return True
         
         
@@ -696,32 +696,30 @@ class GoogleSheetParser:
     # date - дата, по которой и будет происходить запись
     def _getAndConvertGoogleSheetInfo(self, date, googleSheet):
         try:
-            groups, startAtendances, arrayFIOs, atendances = googleSheet.getGoogleSheetInfoByDate(date)
-        except:
-            self.__resultErrors.append('Get bad info from google sheet. May be something wrong with connection.')
-            return False, []
+            groups, startAttendances, arrayFIOs, attendances = googleSheet.getGoogleSheetInfoByDate(date)
+        except Exception as ex:
+            raise ex
 
-        
-        return self._convertFromGoogleSheet(groups, startAtendances, arrayFIOs, atendances), groups
+        return self._convertFromGoogleSheet(groups, startAttendances, arrayFIOs, attendances), groups
 
 
     # получить массив начальных позаций
-    def _getStartAtendancesForGoogleSheet(self):
-        startAtendances=[]
+    def _getStartAttendancesForGoogleSheet(self):
+        startAttendances=[]
         for index in range(len(self.__googleSheetInfoArray)):
-            startAtendances.append(self.__googleSheetInfoArray[index].getPositionInGoogleList())
-        return startAtendances 
+            startAttendances.append(self.__googleSheetInfoArray[index].getPositionInGoogleList())
+        return startAttendances 
 
     # получить массив посещений
-    def _getAtendancesForGoogleSheet(self):
-        atendances=[]
+    def _getAttendancesForGoogleSheet(self):
+        attendances=[]
         for index in range(len(self.__googleSheetInfoArray)):
-            atendances.append(self.__googleSheetInfoArray[index].getAtendanceArray())
-        return atendances  
+            attendances.append(self.__googleSheetInfoArray[index].getAttendanceArray())
+        return attendances  
         
 
     # функция, которая проставляет новую информацию по посещениям
-    def setAtendanceFromNicksToGoogleSheet(self, date, nicks):
+    def setAttendanceFromNicksToGoogleSheet(self, date, nicks):
         # Обнуляем предупреждения и ошибки
         self.__resultWarnings=[]
         self.__resultErrors=[]
@@ -731,56 +729,63 @@ class GoogleSheetParser:
         self._clearDictResult()
         
         googleSheet=None
+        if (len(nicks)<=0):
+            raise Exception("Don't have a nick to parse")
+            
         try:
-            googleSheet = googleSheetDefault.GoogleSheet()
-        except:
-            print('Something wrong with the connection to GoogleSheet...')
+            googleSheet = GoogleSheet()
+        except Exception as ex:
+            raise ex
         
-        
-        result, groups = self._getAndConvertGoogleSheetInfo(date, googleSheet)
+        try:
+            result, groups = self._getAndConvertGoogleSheetInfo(date, googleSheet)
+        except Exception as ex:
+            raise ex
         #print(len(self.__googleSheetInfoArray))
         #for element in self.__googleSheetInfoArray:
         #    print(element.getGroup())
         #    print(element.getPositionInGoogleList())        
         #    print(element.getArrayOfPartsFIOs())
-        #    print(element.getAtendanceArray())    
+        #    print(element.getAttendanceArray())    
             
         if (result==False):
-            return result, '', self.__resultWarnings, self.__resultErrors
+            return result, self.__resultWarnings, self.__resultErrors
         
         self._findAllNicksFromGroupAndFIO(groups, nicks)
         
-        startAtendances=self._getStartAtendancesForGoogleSheet()
+        startAttendances=self._getStartAttendancesForGoogleSheet()
         
-        atendances=self._getAtendancesForGoogleSheet()      
+        attendances=self._getAttendancesForGoogleSheet()      
         
         
-        result, sendErrors = googleSheet.setAllAtendancesSheet(groups, startAtendances, atendances)
+        result, sendErrors = googleSheet.setAllAttendancesSheet(groups, startAttendances, attendances)
         #print(groups)
-       # print(startAtendances)
-        #print(atendances)
+        #print(startAttendances)
+        #print(attendances)
         # объединяем списки ошибок
         self.__resultErrors+=sendErrors
-        
-        return result, self.__dictResultToMessage(), self.__resultWarnings, self.__resultErrors
+        if (result == False):
+            return result, self.__resultWarnings, self.__resultErrors
+        else:
+            return self.__dictResultToMessage(), self.__resultWarnings, self.__resultErrors
 
-Name_File = 'test.txt'           
+#Name_File = 'test.txt'           
 # загрузка никнеймов с текстового документа для тестировки
-def getNicksFromFile(nameFile):
-    with open(nameFile, encoding='utf-8') as file:
-        nicks = [row.strip() for row in file]
-    while '' in nicks:
-        nicks.remove('')
-    return nicks
+#def getNicksFromFile(nameFile):
+#    with open(nameFile, encoding='utf-8') as file:
+#        nicks = [row.strip() for row in file]
+#    while '' in nicks:
+#        nicks.remove('')
+#    return nicks
       
-# get nicks from file
-nicks=getNicksFromFile(Name_File)
+#get nicks from file
+#nicks=getNicksFromFile(Name_File)
 
-googleSheetParser=GoogleSheetParser()
-print(nicks)
-result, messageResult, resWarnings, resErrors = googleSheetParser.setAtendanceFromNicksToGoogleSheet('09.04', nicks)
+#googleSheetParser=GoogleSheetParser()
+#print(nicks)
+#messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('09.04', nicks)
 
-print(result)
-print(messageResult)
-print(resWarnings)
-print(resErrors)
+
+#print(messageResult)
+#print(resWarnings)
+#print(resErrors)
