@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import googleSheet
+from googleSheet import GoogleSheetParser
+
 import logging
 
 import datetime
@@ -16,12 +19,21 @@ from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGG
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s :: %(levelname)s :: %(message)s')
 logger = logging.getLogger(__name__)
 
+MIN_TIME_DELTA=5
+Min_Time_Delta=timedelta(minutes=MIN_TIME_DELTA)
 
 class LogClient(discord.Client):
     async def on_ready(self):
         logger.info("Logged on as %s!", self.user)
 
     async def on_message(self, message: discord.Message):
+        """
+        React on message, if Format is right, than perform actions of atendance
+        
+        :param message: object of discord.Message
+     
+        :returns: file or result of sending to Google Sheet    
+        """
         # TODO: Handle exceptions everywhere
 
         # Check if user has required role to speak to the bot
@@ -32,23 +44,24 @@ class LogClient(discord.Client):
         logger.info("Message from %s: %s", message.author, message.content)
 
         # Parse message
-        query = LogQuery.from_message(message.content)
-
+        query = ''
+        try:
+            query = LogQuery.from_message(message.content)
+        except Exception as ex:
+            await message.channel.send(ex)   
+            return
         guild = message.channel.guild
-
         # Get channel with logs
         log_channel = None
         for channel in guild.channels:
             if channel.name == LOG_CHANNEL:
                 log_channel = channel
                 break
-
         # Get messages and parse them
         messages = await \
             get_log(log_channel, query)
         logger.info("Retrieved %d messages", len(messages))
         report = parse_log(messages, query, guild)
-
         # Render a report
         if query.output_type == 'tsv':
             sep = '\t'
@@ -60,28 +73,81 @@ class LogClient(discord.Client):
         elif query.output_type == 'txt':
             sep = '\t'
             query.output_type = 'txt'
-        else:
+        elif query.output_type != 'google':
             logger.error("Unknown output format %s", query.output_type)
             await message.channel.send(f"Unknown output format {query.output_type}")
             return
-        # TODO: Do we need to optimize user names queries here?
-        rendered_report = f"\ufeffname{sep}joined_at{sep}left_at{sep}time_spent\n"
-        for entry in report:
-            member = message.channel.guild.get_member(entry.user_id)
-            if member:
-                member_name = member.display_name
-            else:
-                member_name = f"Unknown <{entry.user_id}>"
-                logger.error("Unknown user with id %d", entry.user_id)
-            rendered_report += entry.render(member_name, sep=sep)
+            
+        if query.output_type != 'google':
+            # TODO: Do we need to optimize user names queries here?
+            rendered_report = f"\ufeffname{sep}joined_at{sep}left_at{sep}time_spent\n"
+            for entry in report:
+                member = message.channel.guild.get_member(entry.user_id)
+                if member:
+                    member_name = member.display_name
+                else:
+                    member_name = f"Unknown <{entry.user_id}>"
+                    logger.error("Unknown user with id %d", entry.user_id)
+                rendered_report += entry.render(member_name, sep=sep)
+            # Send the report as file
 
-        # Send the report as file
-        filename = f"{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.{query.output_type}" #noqa
-        await message.channel.send(
-            file=File(io.StringIO(rendered_report), filename=filename))
+            filename = f"{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}--{query.channel_name}.{query.output_type}" #noqa
+            await message.channel.send(
+                file=File(io.StringIO(rendered_report), filename=filename))
+        else:     
+            
+            if f'{query.date_end:%y.%m.%d}'!= f'{query.date_start:%y.%m.%d}':
+                await message.channel.send("Not equal start and end dates - can' set atendance to google sheet")
+                return
+            await message.channel.send("Please, wait for results...")      
+            totalErrorsDiscord=[] #  for errors from discord
+            totalErrors=[] #  for errors from parser and googleSheet
+            totalWarnings=[] # for warning from parser and googleSheet
+            totalInfo=[] #  for user, which don't spend enough time
+            totalResult='None result'
+            renderDict={}
+            for entry in report:            
+                member = message.channel.guild.get_member(entry.user_id)   
+                if member:
+                    member_name = member.display_name
+                else:
+                    logger.error("Unknown user with id %d", entry.user_id)    
+                    totalErrorsDiscord.append("Error: unknown user with id " + str(entry.user_id) + " in discord")
+                    # For unknown id - is not neccessary to show errors in result doument
+                    continue
+                entry.setUniqueFromRenderInDict(member_name, query, renderDict)
+            
+            # clear, when not in delta Time
+            totalInfo, renderDict = compareToArrayRenderDictByMinTimeDelta(renderDict)
+            if (len(renderDict)<=0):
+                await message.channel.send("Nothing was found according to your request...")
+                await message.channel.send("Try to varify name of your channel  or range of dates!")  
+                return
+            # convert to nick
+            try:
+                googleSheetParser = GoogleSheetParser()
+                totalResult, totalWarnings, totalErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet(f'{query.date_end:%d.%m}', renderDict)
+            except Exception as ex:
+                await message.channel.send(ex)
+                return
+            if (totalResult==False):
+                await message.channel.send("Can't update google sheet")
+            else:
+                await message.channel.send(totalResult)
+                
+            
 
 
 async def get_log(log_channel: discord.TextChannel, query: LogQuery) -> [discord.Message]:
+    """
+    React on message, if Format is right, than perform actions of atendance
+    
+    :info: -> [discord.Message] need to send discord.Message
+    
+    :param message: object of discord.Message
+    
+    :returns: file or result of sending to Google Sheet    
+    """
     messages = await log_channel.history(
         limit=None,
         after=convert_to_utc(query.date_start),
@@ -98,6 +164,15 @@ def convert_to_utc(dt: datetime) -> datetime:
 
 
 def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild) -> [ReportEntry]:
+    """
+    React on message, if Format is right, than perform actions of atendance
+    
+    :param messages: Array of messages between start and end date
+    :param LogQuery: object of parse user message info
+    :param guild: information about channels
+
+    :returns: array of Objects reportEntry   
+    """
     report: [ReportEntry] = []
 
     for desc, time in list(map(lambda x: (x.embeds[0].description, x.created_at), messages)):
@@ -144,6 +219,9 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
     return report
 
 
+    
+
+
 class LogQuery:
     channel_name: str
     date_start: datetime
@@ -159,11 +237,21 @@ class LogQuery:
     @classmethod
     def from_message(cls, message: str) -> LogQuery:
         items = message.replace(',', ';').replace('\n', ';').split(';')
-        channel_name = items[0].strip()
-        date_start = datetime.fromisoformat(items[1].strip()).astimezone()
-        date_end = datetime.fromisoformat(items[2].strip()).astimezone()
-        # if len(items) > 3:
-        output_type = items[3].strip() if len(items) > 3 else 'txt'
+        channel_name=''
+        date_start=''
+        date_end=''
+        output_type=''
+        try:
+            channel_name = items[0].strip()
+            date_start = datetime.fromisoformat(items[1].strip()).astimezone()
+            date_end = datetime.fromisoformat(items[2].strip()).astimezone()
+            if len(items) > 3:
+                output_type = items[3].strip() 
+            else:
+                output_type ='txt'
+        except Exception as ex:
+            raise Exception("Wrong format of message try to use this format: {name channel}, yyyy-mm-dd hh:mm, yyyy-mm-dd hh:mm, {file format}}")
+        print(channel_name)
         return cls(channel_name, date_start, date_end, output_type)
 
 
@@ -178,14 +266,31 @@ class ReportEntry:
         self.date_start = None
         self.date_end = None
 
-    @property
+    def elapsed_time_withBorders(self, dateStartMessage, dateEndMessage) -> timedelta:
+        print('---there---')
+        print(self.date_start)
+        print(self.date_end)
+        print(dateStartMessage)
+        print(dateEndMessage)        
+        if self.date_start is not None and self.date_end is not None:
+            return self.date_end - self.date_start
+        elif self.date_start is not None and self.date_end is None:
+            return dateEndMessage - self.date_start
+        elif self.date_start is None and self.date_end is not None:
+            return self.date_end - dateStartMessage       
+        else:
+            return timedelta(0)
+    
+    @property            
     def elapsed_time(self) -> timedelta | None:
         if self.date_start is not None and self.date_end is not None:
             return self.date_end - self.date_start
         else:
             return None
 
+
     def render(self, username: str, sep: str = '\t') -> str:
+
         elapsed_time_s = ''
         if self.elapsed_time is not None:
             elapsed_time_s = ReportEntry.strfdelta(self.elapsed_time, '{hours:02}:{minutes:02}:{seconds:02}')
@@ -201,6 +306,15 @@ class ReportEntry:
         # return f'{username}\t{date_start_s}\t{date_end_s}\t{elapsed_time_s}\n'
         return f'{sep}'.join([username, date_start_s, date_end_s, elapsed_time_s]) + '\n'
 
+
+    # for result query google sheet - set unique:
+    # renderDict is changing
+    def setUniqueFromRenderInDict(self, username: str, query: LogQuery, renderDict: dict):
+       if username in renderDict:
+            renderDict[username]+=self.elapsed_time_withBorders(query.date_start, query.date_end)
+       else:
+            renderDict[username]=self.elapsed_time_withBorders(query.date_start, query.date_end)
+
     @staticmethod
     def strfdelta(tdelta, fmt):
         d = {'days': tdelta.days}
@@ -208,6 +322,20 @@ class ReportEntry:
         d['minutes'], d['seconds'] = divmod(rem, 60)
         return fmt.format(**d)
 
+# clear all names in dict, which don't have need Time and compare to array of names
+def compareToArrayRenderDictByMinTimeDelta(renderDict:dict):
+    renderArray=[]
+    totalInfo=[]
+    for username in renderDict:
+        if renderDict[username]>=Min_Time_Delta:
+            renderArray.append(username)
+        else:
+            totalInfo.append("Person with nick '" +str(username) + "' was not enough time in lectures: " + \
+                ReportEntry.strfdelta(renderDict[username], '{hours:02}:{minutes:02}:{seconds:02}'))
+    return totalInfo, renderArray
+            
+        
+    
 
 if __name__ == '__main__':
     intents = discord.Intents.default()
