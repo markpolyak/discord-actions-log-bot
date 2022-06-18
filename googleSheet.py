@@ -130,8 +130,8 @@ class GoogleSheetParser:
 
 
     def __init__(self):
-        self.__resultErrors = [] # example: '4933'
-        self.__resultWarnings=[] # position in google Sheet - example: [A, 0] or [0, 0]
+        self.__resultErrors = []
+        self.__resultWarnings=[] 
         self.__googleSheetInfoArray=[]
         self._clearDictResult()
         
