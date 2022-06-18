@@ -14,6 +14,8 @@ class GoogleSheet:
     # We need write access to the __spreadsheet: https://developers.google.com/sheets/api/guides/authorizing
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
+    # SETTINGS IN FORMAT ARRAY - FROM 0 (IN SHEET - FROM 1)
+
     # row, where start name attendance
     _row_start_name_attendance=0
 
@@ -40,7 +42,7 @@ class GoogleSheet:
 
     def __init__(self):
         """
-        Performs authentication and creates a service.spreadsheets() instance
+        Performs authentication and creates a __spreadsheet instance
         
         """
         creds = None
