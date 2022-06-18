@@ -13,13 +13,12 @@ from datetime import datetime, timezone, timedelta
 import discord
 from discord import File
 
-from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGGING_BOT
+from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGGING_BOT, MIN_TIME_DELTA
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s :: %(levelname)s :: %(message)s')
 logger = logging.getLogger(__name__)
 
-MIN_TIME_DELTA=5
 Min_Time_Delta=timedelta(minutes=MIN_TIME_DELTA)
 
 class LogClient(discord.Client):
