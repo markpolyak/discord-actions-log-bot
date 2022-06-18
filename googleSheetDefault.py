@@ -1,5 +1,3 @@
-import googleSheetSettings
-
 import re
 import math
 
@@ -9,6 +7,10 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
+from googleSheetSettings import GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_PICKLE, GOOGLE_SPREADSHEET_ID, NAME_OF_ATTENDANCE
+from googleSheetSettings import ROW_START_NAME_ATTENDANCE, ROW_START_Date_ATTENDANCE, COL_START_FIOS, ROW_START_FIOS
+
+
 class GoogleSheet:
     # If modifying these scopes, delete the file token.pickle.
     # We need write access to the __spreadsheet: https://developers.google.com/sheets/api/guides/authorizing
@@ -16,24 +18,25 @@ class GoogleSheet:
 
     # SETTINGS IN FORMAT ARRAY - FROM 0 (IN SHEET - FROM 1)
 
-    # row, where start name attendance
-    _row_start_name_attendance=0
-
-    # row, where start date
-    _row_start_date_attendance=1
-
-    # col where start FIOs
-    _col_start_FIOs=1
-
-    # row where start FIOs
-    _row_start_FIOs=2
-
     # rows begin in google Sheet with 1, not 0
     _shift_rows=1
-
+    
     # length English Words 26-1
     _len_English_Sub=26
   
+    # SET IN INIT
+    
+    # row, where start name attendance
+    _row_start_name_attendance=0
+    # row, where start date
+    _row_start_date_attendance=0
+
+    # col where start FIOs
+    _col_start_FIOs=0
+
+    # row where start FIOs
+    _row_start_FIOs=0
+
     # our Sheets
     __spreadsheet = None
     
@@ -42,15 +45,31 @@ class GoogleSheet:
 
     def __init__(self):
         """
-        Performs authentication and creates a __spreadsheet instance
+        Performs authentication and creates a __spreadsheet instance. Set values to variables from settings.
         
         """
+        # row, where start name attendance
+        self._row_start_name_attendance=ROW_START_NAME_ATTENDANCE-self._shift_rows
+
+        # row, where start date
+        self._row_start_date_attendance=ROW_START_Date_ATTENDANCE-self._shift_rows
+
+        # col where start FIOs
+        self._col_start_FIOs=COL_START_FIOS-self._shift_rows
+
+        # row where start FIOs
+        self._row_start_FIOs=ROW_START_FIOS-self._shift_rows
+        
+        if (self._row_start_name_attendance<0 or self._row_start_date_attendance<0 or self._col_start_FIOs<0 or self._row_start_FIOs<0
+            or NAME_OF_ATTENDANCE == '' or GOOGLE_TOKEN_PICKLE=='' or GOOGLE_CREDENTIALS_FILE=='' or GOOGLE_SPREADSHEET_ID==''):
+            raise Exception('Wrong settings in googleSheetSettings.py')
+        
         creds = None
         # The file token.pickle stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-        if os.path.exists(googleSheetSettings.google_token_pickle):
-            with open(googleSheetSettings.google_token_pickle, 'rb') as token:
+        if os.path.exists(GOOGLE_TOKEN_PICKLE):
+            with open(GOOGLE_TOKEN_PICKLE, 'rb') as token:
                 creds = pickle.load(token)
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
@@ -58,10 +77,10 @@ class GoogleSheet:
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    googleSheetSettings.google_credentials_file, self.SCOPES)
+                    GOOGLE_CREDENTIALS_FILE, self.SCOPES)
                 creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
-            with open(googleSheetSettings.google_token_pickle, 'wb') as token:
+            with open(GOOGLE_TOKEN_PICKLE, 'wb') as token:
                 pickle.dump(creds, token)
 
         service = build('sheets', 'v4', credentials=creds, cache_discovery=False)
@@ -77,7 +96,7 @@ class GoogleSheet:
         :returns: list with sheet names
         """
         sheets = []
-        result = self.__spreadsheet.get(spreadsheetId=googleSheetSettings.google_spreadsheet_id).execute()
+        result = self.__spreadsheet.get(spreadsheetId=GOOGLE_SPREADSHEET_ID).execute()
         for s in result['sheets']:
             sheets.append(s.get('properties', {}).get('title'))
         return sheets
@@ -116,14 +135,14 @@ class GoogleSheet:
         data = {}
         arrBatchRanges = self._getBatchRanges(sheets)
         
-        request = self.__spreadsheet.values().batchGet(spreadsheetId=googleSheetSettings.google_spreadsheet_id, ranges=arrBatchRanges, majorDimension=dimension)
+        request = self.__spreadsheet.values().batchGet(spreadsheetId=GOOGLE_SPREADSHEET_ID, ranges=arrBatchRanges, majorDimension=dimension)
         response = request.execute()
         for i in range(0, len(response.get('valueRanges'))):
             data[str(sheets[i])] = response.get('valueRanges')[i].get('values')
         return data
       #for sheet in sheets:
             
-      #      request = self.__spreadsheet.values().batchGet(spreadsheetId=googleSheetSettings.google_spreadsheet_id, ranges=str(sheet)+'!A1:AJ1000', majorDimension=dimension)
+      #      request = self.__spreadsheet.values().batchGet(spreadsheetId=GOOGLE_SPREADSHEET_ID, ranges=str(sheet)+'!A1:AJ1000', majorDimension=dimension)
       #      response = request.execute()
        #     print(response.get('valueRanges')[0])
        #     data[sheet] = response.get('valueRanges')[0].get('values')
@@ -167,7 +186,7 @@ class GoogleSheet:
                     else:
                         break 
                 # if wind key-word - is start of attendance
-                elif (sheetData[indexCol][self._row_start_name_attendance]==googleSheetSettings.name_of_attendance):
+                elif (sheetData[indexCol][self._row_start_name_attendance]==NAME_OF_ATTENDANCE):
                     startAttendance.append(indexCol)
                     isattendance=True
                     # set exist date
@@ -424,7 +443,7 @@ class GoogleSheet:
             'valueInputOption': 'RAW', # USER_ENTERED
             'data': data
         }
-        result = self.__spreadsheet.values().batchUpdate(spreadsheetId=googleSheetSettings.google_spreadsheet_id, body=body).execute()
+        result = self.__spreadsheet.values().batchUpdate(spreadsheetId=GOOGLE_SPREADSHEET_ID, body=body).execute()
         return result.get('totalUpdatedCells')
 
         
