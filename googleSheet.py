@@ -17,8 +17,6 @@ import googleSheetDefault
 # - то мы не можем воспринять, что это Петров А. В.
 # Алгоритм пытается соотнести содержимое никнейма и результата
   
-Static_Variants=[1, 2, 3, 4] 
- 
 # Класс, определяющий парсинг информации с гугл sheet
 class GoogleSheetInfo:
     
@@ -80,7 +78,7 @@ class variantsOfAlgoritm(enum.Enum):
         withUpperBeginAndLowerAnother = 3 # приводим к верхнему регистру начало, остальное к нижнему
         withConvertToRussian = 4 # переводим все английские буквы в русские
 
-# we can choose only few of them
+# dictionary of variants for parse name
 dictVariantsOfAlgoritm = {
     0 : [variantsOfAlgoritm.withSpace],
     1 : [variantsOfAlgoritm.withSpace, variantsOfAlgoritm.withUpperBegin],
@@ -559,7 +557,7 @@ class GoogleSheetParser:
         # пробегаемся по всем вариантам словаря
         for variantIndex in range(len(dictVariantsOfAlgoritm)):
             nickArr = self._getPartsFormNickAlgoritm(parseNick, dictVariantsOfAlgoritm[variantIndex])
-            print(nickArr)
+
             # если количество элементов, полученных из ника слишком большое или слишком малое
             if (len(nickArr)>3 or len(nickArr)<1):
                 continue
@@ -790,16 +788,6 @@ class GoogleSheetParser:
         else:
             return self.__dictResultToMessage(), self.__resultWarnings, self.__resultErrors
          
-# загрузка никнеймов с текстового документа для тестировки
-nicks=['Пeтpoв32432Aндрей@49#3$3№32432ВлаДимИрович']
-googleSheetParser=GoogleSheetParser()
-print(nicks)
-messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('17.06', nicks)
-
-
-print(messageResult)
-print(resWarnings)
-print(resErrors)
 """
 Name_File = 'test.txt'  
 def getNicksFromFile(nameFile):
@@ -814,7 +802,7 @@ nicks=getNicksFromFile(Name_File)
 
 googleSheetParser=GoogleSheetParser()
 print(nicks)
-messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('09.04', nicks)
+messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('17.06', nicks)
 
 
 print(messageResult)
