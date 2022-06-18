@@ -15,3 +15,6 @@ ALLOWED_ROLE = 'staff'
 
 # Bot name that makes a log
 LOGGING_BOT = 'Dyno'
+
+# Min time in minutes for setting attendance
+MIN_TIME_DELTA=65
