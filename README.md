@@ -39,7 +39,7 @@ Required: Python 3.10 and dependencies listed in `requirements.txt`.
 Required: setting up bot.
 
 1. In settings you should set variable MIN_TIME_ATTENDANCE - integer in minutes. This variable can help to understand - was the person at the lecture enough time - if not, then we left him, but he will be set in result file in format txt
-2. You should create new sheet in Google sheet, if you don't have now. And save id of this sheet in GOOGLE_SPREADDHEET_ID in googleSheetSettings.py. 
+2. You should create new sheet in Google sheet, if you don't have now. And save id of this sheet in GOOGLE_SPREADHEET_ID in googleSheetSettings.py. 
 <i>Condition of the structure:</i>
    + all FIO should be in one column
    + all dates should be in one row
