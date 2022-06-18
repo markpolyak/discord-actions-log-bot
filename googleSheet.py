@@ -162,8 +162,8 @@ class GoogleSheetParser:
         return "Total already updated: " + str(self.__dictResult['alreadyUpdated']) + '\n' + \
             "Total updated: " + str(self.__dictResult['updated']) +'\n' + \
             "Total not updated: " + str(self.__dictResult['notUpdated']) +'\n' + \
-            "Total errors: " + str(self.__dictResult['errors']) +'\n' + \
-            "Total warnings: " + str(self.__dictResult['warnings']) +'\n'
+            "Total google errors: " + str(self.__dictResult['errors']) +'\n' + \
+            "Total google warnings: " + str(self.__dictResult['warnings']) +'\n'
 
 
     # преобразует массив вида [group, [arrfio, arrfio]] в строку вида "'group': 'f i o' 'f i o'; "
