@@ -7,8 +7,8 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-from googleSheetSettings import GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_PICKLE, GOOGLE_SPREADSHEET_ID, NAME_OF_ATTENDANCE
-from googleSheetSettings import ROW_START_NAME_ATTENDANCE, ROW_START_Date_ATTENDANCE, COL_START_FIOS, ROW_START_FIOS
+from settings import GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_PICKLE, NAME_OF_ATTENDANCE
+from settings import ROW_START_NAME_ATTENDANCE, ROW_START_Date_ATTENDANCE, COL_START_FIOS, ROW_START_FIOS
 
 
 class GoogleSheet:
@@ -40,7 +40,7 @@ class GoogleSheet:
     # our Sheets
     __spreadsheet = None
     
-    
+    _GOOGLE_SPREADSHEET_ID=''
     
 
     def __init__(self):
@@ -61,7 +61,7 @@ class GoogleSheet:
         self._row_start_FIOs=ROW_START_FIOS-self._shift_rows
         
         if (self._row_start_name_attendance<0 or self._row_start_date_attendance<0 or self._col_start_FIOs<0 or self._row_start_FIOs<0
-            or NAME_OF_ATTENDANCE == '' or GOOGLE_TOKEN_PICKLE=='' or GOOGLE_CREDENTIALS_FILE=='' or GOOGLE_SPREADSHEET_ID==''):
+            or NAME_OF_ATTENDANCE == '' or GOOGLE_TOKEN_PICKLE=='' or GOOGLE_CREDENTIALS_FILE==''):
             raise Exception('Wrong settings in googleSheetSettings.py')
         
         creds = None
@@ -88,7 +88,10 @@ class GoogleSheet:
         # Call the Sheets API
         self.__spreadsheet = service.spreadsheets()
 
-
+    def _setIdGoogleSheet(self, id_google_sheet):
+        self._GOOGLE_SPREADSHEET_ID=id_google_sheet
+    
+    
     def _get_sheet_names(self):
         """
         Get all sheet names that are present on the spreadsheet
@@ -96,7 +99,10 @@ class GoogleSheet:
         :returns: list with sheet names
         """
         sheets = []
-        result = self.__spreadsheet.get(spreadsheetId=GOOGLE_SPREADSHEET_ID).execute()
+        try:
+            result = self.__spreadsheet.get(spreadsheetId=self._GOOGLE_SPREADSHEET_ID).execute()
+        except Exception as ex:
+            raise Exception("Can't get groups from google sheet. Please check the correctness of the google spreadheet ID.\nYou can find this ID in url of your google Table\nFull text of exception: " + str(ex))
         for s in result['sheets']:
             sheets.append(s.get('properties', {}).get('title'))
         return sheets
@@ -109,7 +115,7 @@ class GoogleSheet:
         :param nameSheet: current name of sheet
         :returns: range from sheet in form 'M911' -> 'M911!A1:AJ1000'
         """
-        return str(nameSheet)+'!A1:AJ1000'
+        return f"'{str(nameSheet)}'!A1:AJ1000"
 
     def _getBatchRanges(self, arrNameSheet):
         """
@@ -135,14 +141,15 @@ class GoogleSheet:
         data = {}
         arrBatchRanges = self._getBatchRanges(sheets)
         
-        request = self.__spreadsheet.values().batchGet(spreadsheetId=GOOGLE_SPREADSHEET_ID, ranges=arrBatchRanges, majorDimension=dimension)
+        request = self.__spreadsheet.values().batchGet(spreadsheetId=self._GOOGLE_SPREADSHEET_ID, ranges=arrBatchRanges, majorDimension=dimension)
         response = request.execute()
+        
         for i in range(0, len(response.get('valueRanges'))):
             data[str(sheets[i])] = response.get('valueRanges')[i].get('values')
         return data
       #for sheet in sheets:
             
-      #      request = self.__spreadsheet.values().batchGet(spreadsheetId=GOOGLE_SPREADSHEET_ID, ranges=str(sheet)+'!A1:AJ1000', majorDimension=dimension)
+      #      request = self.__spreadsheet.values().batchGet(spreadsheetId=self._GOOGLE_SPREADSHEET_ID, ranges=str(sheet)+'!A1:AJ1000', majorDimension=dimension)
       #      response = request.execute()
        #     print(response.get('valueRanges')[0])
        #     data[sheet] = response.get('valueRanges')[0].get('values')
@@ -336,7 +343,7 @@ class GoogleSheet:
         return lenArray
 
     
-    def getGoogleSheetInfoByDate(self, date):
+    def getGoogleSheetInfoByDate(self, date, id_google_sheet):
         """
         Get all necessary info by googleSheetSettings, static params and date.
         
@@ -349,12 +356,13 @@ class GoogleSheet:
                     colPositionDates - array of horizontal position of the date and Attendances
                     attendances - array of array attendances for avery group              
         """
-        
+        self._setIdGoogleSheet(id_google_sheet)
         # get all sheets
         # sheets are equal groups
         sheets=self._get_sheet_names()
         # get all info in every sheet
         result = self._get_multiple_sheets_data(sheets)
+
         # get start position of dates and attendance, and also dates
         startAttendance, datesAttendance = self._find_dates_and_ranges_attendance(sheets, result)
         # get horizontal position of date for attandance for all sheets
@@ -362,6 +370,8 @@ class GoogleSheet:
         # Convert to actual info
         sheets = self._dropInfoWthoutDate(sheets, colPositionDates)
         colPositionDates = self._dropInfoWthoutDate(colPositionDates, colPositionDates)      
+        if (len(sheets)<=0):
+            raise Exception("Сan't find the group that studied that day in google sheet. Check your input date or check dates in google sheets!")
         # get FIOs for every sheet
         FIOs = self._find_FIOs(sheets, result)
         lenArray = self._getSizeOfArraysInArray(FIOs)
@@ -386,7 +396,7 @@ class GoogleSheet:
         
         :returns: region in format '{nameSheet}!{startCol}{startRow}:{endCol}{endRow}'           
         """
-        return str(nameSheet)+'!'+str(startCol)+str(startRow)+':'+str(endCol)+str(endRow)
+        return f"'{str(nameSheet)}'!{str(startCol)}{str(startRow)}:{str(endCol)}{str(endRow)}"
     
     
     def _getColNameFromColInt(self, col):
@@ -398,9 +408,9 @@ class GoogleSheet:
         :returns: col like in google sheet: 2-> 'C', 27-> 'AB'         
         """
         row=''
-        while (col>0):
+        while (col>=0):
             row=chr(ord('A')+int(col%self._len_English_Sub))+row
-            col=math.floor(col/self._len_English_Sub)
+            col=math.floor(col/self._len_English_Sub)-1
         return row
       
        
@@ -435,20 +445,25 @@ class GoogleSheet:
         """
         atendanse=self._convertToSendAttendance(atendanse)
         col=self._getColNameFromColInt(col)
+        #myRange='self._getRange(nameSheet, col, startRow, col, endRow)'
         data = [{
             'range': self._getRange(nameSheet, col, startRow, col, endRow),
             'values': atendanse
         }]
+        
         body = {
             'valueInputOption': 'RAW', # USER_ENTERED
             'data': data
         }
-        result = self.__spreadsheet.values().batchUpdate(spreadsheetId=GOOGLE_SPREADSHEET_ID, body=body).execute()
+        try:
+            result = self.__spreadsheet.values().batchUpdate(spreadsheetId=self._GOOGLE_SPREADSHEET_ID, body=body).execute()
+        except Exception as ex:
+            raise Exception("Can't send information to google sheet. Please check the correctness of the google spreadheet ID.\nYou can find this ID in url of your google Table.\nFull text of exception: " + str(ex))
         return result.get('totalUpdatedCells')
 
         
        
-    def setAllAttendancesSheet(self, sheets, colPositionDate, attendances):
+    def setAllAttendancesSheet(self, sheets, colPositionDate, attendances, id_google_sheet):
         """
         Update region (which is atendanse) in google sheet for all sheets
         
@@ -459,6 +474,7 @@ class GoogleSheet:
         :returns:   isSendSomething - result of send (did we send somthing?)
                     sendErrors - log of errors, which we get, when send information
         """
+        self._setIdGoogleSheet(id_google_sheet)
         isSendSomething=False
         sendErrors = []
 
@@ -472,12 +488,12 @@ class GoogleSheet:
                         attendances[index])>0):
                         isSendSomething=True                    
                     else:
-                        sendErrors.append["For unknown reasons we can't send attendance info to group " + sheets[index] + ' (zero updated)'] 
-                except:
-                    sendErrors.append["For unknown reasons we can't send attendance info to group " + sheets[index] + " (can't connect to sheet)"] 
+                        sendErrors.append("For unknown reasons we can't send attendance info to group " + sheets[index] + " (zero updated).")
+                except Exception as ex:
+                    sendErrors.append("For unknown reasons we can't send attendance info to group " + sheets[index] + " (can't connect to sheet).\n\tFull text of exception: " + str(ex))
             else:
                 # we can check this, where we get info - but in main fuction we couldn't find man with empty group (it can help to teacher)
-                sendErrors.append['For group ' + sheets[index] + ' length of attendance equal zero']      
+                sendErrors.append('For group ' + sheets[index] + ' length of attendance equal zero')    
         return isSendSomething, sendErrors
             
 #googleSheet=GoogleSheet()    
