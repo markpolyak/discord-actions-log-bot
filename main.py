@@ -19,7 +19,7 @@ from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGG
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s :: %(levelname)s :: %(message)s')
 logger = logging.getLogger(__name__)
 
-Min_Time_Delta=timedelta(minutes=MIN_TIME_DELTA)
+Min_Time_Delta=None
 
 class LogClient(discord.Client):
     async def on_ready(self):
@@ -34,7 +34,7 @@ class LogClient(discord.Client):
         :returns: file or result of sending to Google Sheet    
         """
         # TODO: Handle exceptions everywhere
-
+        global Min_Time_Delta
         # Check if user has required role to speak to the bot
         if (message.channel.name != COMMAND_CHANNEL
                 or ALLOWED_ROLE not in map(lambda x: x.name, message.author.roles)):
@@ -80,7 +80,15 @@ class LogClient(discord.Client):
                 return                
             if f'{query.date_end:%y.%m.%d}'!= f'{query.date_start:%y.%m.%d}':
                 await message.channel.send("Not equal start and end dates - can' set atendance to google sheet")
-                return    
+                return 
+            if (query.min_attendance_minutes!=None):
+                if (query.min_attendance_minutes.isnumeric() and int(str(query.min_attendance_minutes))>0):
+                    Min_Time_Delta=timedelta(minutes=int(query.min_attendance_minutes))
+                else:
+                    await message.channel.send('Min attendance minutes must be an integer value (not a string), larger than 0!') 
+                    return
+            else:
+                Min_Time_Delta=timedelta(minutes=MIN_TIME_DELTA)
         else:
             logger.error("Unknown output format %s", query.output_type)
             await message.channel.send(f"Unknown output format {query.output_type}")
@@ -244,13 +252,15 @@ class LogQuery:
     date_end: datetime
     output_type: str
     id_google_sheet: str | None
+    min_attendance_minutes: str | None
 
-    def __init__(self, channel_name: str, date_start: datetime, date_end: datetime, output_type: str, id_google_sheet: str):
+    def __init__(self, channel_name: str, date_start: datetime, date_end: datetime, output_type: str, id_google_sheet: str | None, min_attendance_minutes: str | None):
         self.channel_name = channel_name
         self.date_start = date_start
         self.date_end = date_end
         self.output_type = output_type
         self.id_google_sheet = id_google_sheet
+        self.min_attendance_minutes =  min_attendance_minutes
 
     @classmethod
     def from_message(cls, message: str) -> LogQuery:
@@ -265,9 +275,10 @@ class LogQuery:
             date_end = datetime.fromisoformat(items[2].strip()).astimezone()
             output_type = items[3].strip().lower() if len(items) > 3 else 'txt'
             id_google_sheet = items[4].strip() if len(items) > 4 else None  
+            min_attendance_minutes = items[5].strip() if len(items) > 5 else None  
         except Exception as ex:
-            raise Exception("Wrong format of message try to use this format: {name channel}, yyyy-mm-dd hh:mm, yyyy-mm-dd hh:mm, {file format}}")
-        return cls(channel_name, date_start, date_end, output_type, id_google_sheet)
+            raise Exception("Wrong format of message try to use this format: {name channel}, yyyy-mm-dd hh:mm, yyyy-mm-dd hh:mm, {file format}}.")
+        return cls(channel_name, date_start, date_end, output_type, id_google_sheet, min_attendance_minutes)
 
 
 class ReportEntry:
