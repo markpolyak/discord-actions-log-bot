@@ -324,6 +324,8 @@ class GoogleSheetParser:
         # убираем все символы, кроме ФИО (пробелы также удаляются)
         name=self._delAllWthoutName(name)
         name=self._convertSymb(name)
+        if (len(name)<=0):
+            return []
         # парсим и получаем части ФИО
         parseArr=[name[0].upper()]
         currentName=0
@@ -439,7 +441,6 @@ class GoogleSheetParser:
         # считаем все суммы по каждому элемнту ФИО
         for indexFIO in range(len(compareResult)):
             sumResultFIO.append(sum(compareResult[indexFIO][i] for i in range(len(compareResult[indexFIO]))))
-        
         # никнейм
         sumResultNick=[]
         # считаем все суммы по каждому элементу никнейма  
@@ -492,6 +493,8 @@ class GoogleSheetParser:
         isEqual=False # Флаг - было ли равенство
         # Сопостоавляем для каждого ФИО
         for indexFIO in range(len(FIOs)):
+            if (len(FIOs[indexFIO])<=0):
+                continue
              # если никнейм существует по равенству - добавляем в конец рассматриваемого массива
             if (self._compareFIOandNick(FIOs[indexFIO], nickArr, True)):
                 isEqual=True
@@ -557,7 +560,6 @@ class GoogleSheetParser:
         # пробегаемся по всем вариантам словаря
         for variantIndex in range(len(dictVariantsOfAlgoritm)):
             nickArr = self._getPartsFormNickAlgoritm(parseNick, dictVariantsOfAlgoritm[variantIndex])
-
             # если количество элементов, полученных из ника слишком большое или слишком малое
             if (len(nickArr)>3 or len(nickArr)<1):
                 continue
@@ -713,9 +715,9 @@ class GoogleSheetParser:
     # Причем, при записи ФИО сразу преобразует в формат частей ФИО
     # также заносит все никнеймы в гугл таблицу - принимает массивы
     # date - дата, по которой и будет происходить запись
-    def _getAndConvertGoogleSheetInfo(self, date, googleSheet):
+    def _getAndConvertGoogleSheetInfo(self, date, googleSheet, id_google_sheet):
         try:
-            groups, startAttendances, arrayFIOs, attendances = googleSheet.getGoogleSheetInfoByDate(date)
+            groups, startAttendances, arrayFIOs, attendances = googleSheet.getGoogleSheetInfoByDate(date, id_google_sheet)
         except Exception as ex:
             raise ex
 
@@ -738,7 +740,7 @@ class GoogleSheetParser:
         
 
     # функция, которая проставляет новую информацию по посещениям
-    def setAttendanceFromNicksToGoogleSheet(self, date, nicks):
+    def setAttendanceFromNicksToGoogleSheet(self, date, nicks, id_google_sheet):
         # Обнуляем предупреждения и ошибки
         self.__resultWarnings=[]
         self.__resultErrors=[]
@@ -757,7 +759,7 @@ class GoogleSheetParser:
             raise ex
         
         try:
-            result, groups = self._getAndConvertGoogleSheetInfo(date, googleSheet)
+            result, groups = self._getAndConvertGoogleSheetInfo(date, googleSheet, id_google_sheet)
         except Exception as ex:
             raise ex
         #print(len(self.__googleSheetInfoArray))
@@ -777,7 +779,7 @@ class GoogleSheetParser:
         attendances=self._getAttendancesForGoogleSheet()      
         
         
-        result, sendErrors = googleSheet.setAllAttendancesSheet(groups, startAttendances, attendances)
+        result, sendErrors = googleSheet.setAllAttendancesSheet(groups, startAttendances, attendances, id_google_sheet)
         #print(groups)
         #print(startAttendances)
         #print(attendances)
@@ -800,12 +802,17 @@ def getNicksFromFile(nameFile):
 #get nicks from file
 nicks=getNicksFromFile(Name_File)
 
+
 googleSheetParser=GoogleSheetParser()
 print(nicks)
-messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('17.06', nicks)
-
-
+#try:
+messageResult, resWarnings, resErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet('19.02', nicks, '1mcc1xCHx02vXaGjXLmcNNP2VTIk_XrbeJfcYNBg-6Wg')
 print(messageResult)
 print(resWarnings)
 print(resErrors)
+#except Exception as ex:
+#    print(ex)
 """
+
+
+
