@@ -39,8 +39,10 @@ class LogClient(discord.Client):
         if (message.channel.name != COMMAND_CHANNEL
                 or ALLOWED_ROLE not in map(lambda x: x.name, message.author.roles)):
             return
-
+        await message.channel.send("Please, wait for results...")  
+        
         logger.info("Message from %s: %s", message.author, message.content)
+
 
         # Parse message
         query = ''
@@ -56,11 +58,10 @@ class LogClient(discord.Client):
             if channel.name == LOG_CHANNEL:
                 log_channel = channel
                 break
-        # Get messages and parse them
-        messages = await \
-            get_log(log_channel, query)
-        logger.info("Retrieved %d messages", len(messages))
-        report = parse_log(messages, query, guild)
+        
+        # check mistakes before parse maessages (get massages history - is long process)
+                
+        
         # Render a report
         if query.output_type == 'tsv':
             sep = '\t'
@@ -72,10 +73,25 @@ class LogClient(discord.Client):
         elif query.output_type == 'txt':
             sep = '\t'
             query.output_type = 'txt'
-        elif query.output_type != 'google':
+        elif query.output_type == 'google':
+            if (query.id_google_sheet==None or query.id_google_sheet.strip() == ''):
+                await message.channel.send("Wrong Parameters. For google sheet you need set google sheet ID.")
+                await message.channel.send('You can find it in your table url')
+                return                
+            if f'{query.date_end:%y.%m.%d}'!= f'{query.date_start:%y.%m.%d}':
+                await message.channel.send("Not equal start and end dates - can' set atendance to google sheet")
+                return    
+        else:
             logger.error("Unknown output format %s", query.output_type)
             await message.channel.send(f"Unknown output format {query.output_type}")
             return
+        
+        # Get messages and parse them
+        messages = await \
+            get_log(log_channel, query)
+        logger.info("Retrieved %d messages", len(messages))
+        report = parse_log(messages, query, guild)
+        
             
         if query.output_type != 'google':
             # TODO: Do we need to optimize user names queries here?
@@ -94,11 +110,6 @@ class LogClient(discord.Client):
             await message.channel.send(
                 file=File(io.StringIO(rendered_report), filename=filename))
         else:     
-            
-            if f'{query.date_end:%y.%m.%d}'!= f'{query.date_start:%y.%m.%d}':
-                await message.channel.send("Not equal start and end dates - can' set atendance to google sheet")
-                return
-            await message.channel.send("Please, wait for results...")      
             totalErrorsDiscord=[] #  for errors from discord
             totalErrors=[] #  for errors from parser and googleSheet
             totalWarnings=[] # for warning from parser and googleSheet
@@ -115,12 +126,8 @@ class LogClient(discord.Client):
                     # For unknown id - is not neccessary to show errors in result doument
                     continue
                 entry.setUniqueFromRenderInDict(member_name, query, renderDict)
-            print('------------------------HELLO--------------------')
-            print(renderDict)
             # clear, when not in delta Time
             totalInfo, renderDict = compareToArrayRenderDictByMinTimeDelta(renderDict)
-            print(totalInfo)
-            print(renderDict)
             if (len(renderDict)<=0):
                 await message.channel.send("Nothing was found according to your request...")
                 await message.channel.send("Try to varify name of your channel  or range of dates!")  
@@ -128,7 +135,7 @@ class LogClient(discord.Client):
             # convert to nick
             try:
                 googleSheetParser = GoogleSheetParser()
-                totalResult, totalWarnings, totalErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet(f'{query.date_end:%d.%m}', renderDict)
+                totalResult, totalWarnings, totalErrors = googleSheetParser.setAttendanceFromNicksToGoogleSheet(f'{query.date_end:%d.%m}', renderDict, query.id_google_sheet)
             except Exception as ex:
                 await message.channel.send(ex)
                 return
@@ -139,22 +146,13 @@ class LogClient(discord.Client):
                 await message.channel.send('Total Discord Errors: ' + str(len(totalErrorsDiscord)) + '\n' + 'Total not enough time for attendance: ' + str(len(totalInfo)))
             # Result for add
             result=('\n'.join(totalErrors)+'\n' if len(totalErrors)>0 else '') + \
-                    ('\n'.join(totalWarnings)+'\n' if len(totalWarnings)>0 else '')
+                    ('\n'.join(totalWarnings)+'\n' if len(totalWarnings)>0 else '') + \
+                    ('\n'.join(totalErrorsDiscord)+'\n' if len(totalErrorsDiscord)>0 else '') + \
+                    ('\n'.join(totalInfo) if len(totalInfo)>0 else '')
             if (result!=''):
                 # name of File
-                filename = f"errors-google--{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}.txt" 
-                await message.channel.send(file=File(io.StringIO(result), filename=filename)) 
-            
-            # result errors and warnings for discord
-            result=('\n'.join(totalErrorsDiscord)+'\n' if len(totalErrorsDiscord)>0 else '') + \
-                    ('\n'.join(totalInfo) if len(totalInfo)>0 else '')                    
-            
-            if (result!=''):
-                # name of File
-                filename = f"errors-discord--{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}.txt" 
-                await message.channel.send(file=File(io.StringIO(result), filename=filename))  
-            
-
+                filename = f"errors--{query.date_start:%Y-%m-%d_%H-%M-%S}--{query.date_end:%Y-%m-%d_%H-%M-%S}.txt" 
+                await message.channel.send(file=File(io.StringIO(result), filename=filename))     
 
 async def get_log(log_channel: discord.TextChannel, query: LogQuery) -> [discord.Message]:
     """
@@ -245,12 +243,14 @@ class LogQuery:
     date_start: datetime
     date_end: datetime
     output_type: str
+    id_google_sheet: str | None
 
-    def __init__(self, channel_name: str, date_start: datetime, date_end: datetime, output_type: str):
+    def __init__(self, channel_name: str, date_start: datetime, date_end: datetime, output_type: str, id_google_sheet: str):
         self.channel_name = channel_name
         self.date_start = date_start
         self.date_end = date_end
         self.output_type = output_type
+        self.id_google_sheet = id_google_sheet
 
     @classmethod
     def from_message(cls, message: str) -> LogQuery:
@@ -264,10 +264,10 @@ class LogQuery:
             date_start = datetime.fromisoformat(items[1].strip()).astimezone()
             date_end = datetime.fromisoformat(items[2].strip()).astimezone()
             output_type = items[3].strip().lower() if len(items) > 3 else 'txt'
+            id_google_sheet = items[4].strip() if len(items) > 4 else None  
         except Exception as ex:
             raise Exception("Wrong format of message try to use this format: {name channel}, yyyy-mm-dd hh:mm, yyyy-mm-dd hh:mm, {file format}}")
-        print(channel_name)
-        return cls(channel_name, date_start, date_end, output_type)
+        return cls(channel_name, date_start, date_end, output_type, id_google_sheet)
 
 
 class ReportEntry:
@@ -281,12 +281,7 @@ class ReportEntry:
         self.date_start = None
         self.date_end = None
 
-    def elapsed_time_withBorders(self, dateStartMessage, dateEndMessage) -> timedelta:
-        print('---there---')
-        print(self.date_start)
-        print(self.date_end)
-        print(dateStartMessage)
-        print(dateEndMessage)        
+    def elapsed_time_withBorders(self, dateStartMessage, dateEndMessage) -> timedelta:    
         if self.date_start is not None and self.date_end is not None:
             return self.date_end - self.date_start
         elif self.date_start is not None and self.date_end is None:
