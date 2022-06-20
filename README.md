@@ -38,7 +38,8 @@ Required: Python 3.10 and dependencies listed in `requirements.txt`.
    Operating systems, 2022-02-18 11:10, 2022-02-18 12:40, txt
    Computer graphics, 2022-02-18 11:10, 2022-02-18 12:40, tsv
    ```
-   Timezone is optional. Timezone of output is currently always UTC.
+   
+   Timezone is optional (<i>Example: </i><b>2022-02-18T02:00:00+03:00</b>). Timezone of output is currently always UTC.
 
 ## Setting up google sheet modification
 
@@ -73,7 +74,7 @@ Required: setting up bot stage <i>(see upper)</i>.
 8. Examples:
    ```
    General, 2022-02-18 9:30, 2022-02-18 11:00, google
-   OOP, 2022-02-18 11:00, 2022-02-18 12:30, google, 90:
+   OOP, 2022-02-18 11:00, 2022-02-18 12:30, google, 90
    ```
 
 
