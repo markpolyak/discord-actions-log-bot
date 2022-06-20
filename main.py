@@ -69,6 +69,9 @@ class LogClient(discord.Client):
                 
         
         # Render a report
+        #if query.channel_name.lower()==NAME_HELP_COMMAND.lower()
+            #endHelp(message)
+            #return
         if query.output_type == 'tsv':
             sep = '\t'
         elif query.output_type == 'csv':
@@ -160,7 +163,7 @@ class LogClient(discord.Client):
             if (totalResult==False):
                 await message.channel.send("Can't update google sheet")
             else:
-                """
+
                 result_emb=None
                 result_emb = discord.Embed( title = 'RESULT', colour = discord.Color.green())
                 for result in totalResult:
@@ -175,7 +178,7 @@ class LogClient(discord.Client):
                 result_simple=result_simple+"Total Discord Errors"+' '+str(len(totalErrorsDiscord))+'\n'
                 result_simple=result_simple+"Total not enough time for attendance "+' '+str(len(totalErrorsDiscord))
                 await message.channel.send(result_simple)
-                    
+                """
             # Result for add
             result=('\n'.join(totalErrors)+'\n' if len(totalErrors)>0 else '') + \
                     ('\n'.join(totalWarnings)+'\n' if len(totalWarnings)>0 else '') + \
@@ -379,8 +382,11 @@ def compareToArrayRenderDictByMinTimeDelta(renderDict:dict):
                 ReportEntry.strfdelta(renderDict[username], '{hours:02}:{minutes:02}:{seconds:02}'))
     return totalInfo, renderArray
             
-      
-    
+#def sendHelp(message: discord.Message)
+#    try:
+#        with open(nameFile, encoding='utf-8') as file:
+#            nicks = [row.strip() for row in file]
+
 
 if __name__ == '__main__':
     intents = discord.Intents.default()
