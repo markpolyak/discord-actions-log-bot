@@ -11,10 +11,16 @@ COMMAND_CHANNEL = 'посещаемость'
 
 # Role to which bot is allowed to respond to
 # TODO: Make it a list
-ALLOWED_ROLE = 'admin'
+ALLOWED_ROLE = 'your_role'
 
 # Bot name that makes a log
 LOGGING_BOT = 'Dyno'
+
+# name of command for call help
+NAME_HELP_COMMAND='help-attendance'
+
+# name of file, where help information is
+NAME_HELP_File='help.txt'
 
 # Min time in minutes for setting attendance
 MIN_TIME_DELTA=60
