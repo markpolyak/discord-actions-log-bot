@@ -8,7 +8,7 @@ date and time start of lecture in format: yyyy-mm-dd hh:mm
 -> _date_-_time_-_end_
 date and time start of lecture in format: yyyy-mm-dd hh:mm
 -> _file_-_format_
-format of result file, which contains information about attendance of your query. Formats: tsv, txt, csv, excel
+format of result file, which contains information about attendance of your query. Formats: tsv, txt, csv, excel (csv)
 GOOGLE MODE
 I get message in format: _name_-_of_-_channel_,  _date_-_time_-_start_, _date_-_time_-_end_, google, _min_-_attendance_-_minutes_
 -> _name_-_of_-_channel_,  _date_-_time_-_start_, _date_-_time_-_end_
