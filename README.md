@@ -77,7 +77,7 @@ Required: setting up bot stage <i>(see upper)</i>.
    OOP, 2022-02-18 11:00, 2022-02-18 12:30, google, 90
    ```
 
-<b>Important:</b> For embed messageы you need to give permissions to bot:  `SEND MESSAGES`, `EMBED LINKS`, `ATTACH FILES`.
+<b>Important:</b> for embed messages you need to give permissions to bot:  `SEND MESSAGES`, `EMBED LINKS`, `ATTACH FILES`.
 
 ## Help attendance
 1. You can change name command for help menu in variable NAME_HELP_COMMAND
