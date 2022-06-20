@@ -1,5 +1,7 @@
 # Discord bot token. Can be retrieved at https://discord.com/developers/applications/
 # by creating a new bot for an application.
+# Credential token. Can be retrieved at https://console.cloud.google.com/apis
+# by crating a new API and getting OAth.
 import os
 BOT_TOKEN = os.environ['BOT_TOKEN']
 
@@ -20,10 +22,10 @@ LOGGING_BOT = 'Dyno'
 NAME_HELP_COMMAND='help-attendance'
 
 # name of file, where help information is
-NAME_HELP_File='help.txt'
+NAME_HELP_FILE='help.txt'
 
 # Min time in minutes for setting attendance
-MIN_TIME_DELTA=60
+MIN_TIME_ATTENDANCE=60
 
 # path to crefential file
 GOOGLE_CREDENTIALS_FILE = 'credentials.json'
