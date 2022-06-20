@@ -7,11 +7,11 @@ the name of the channel for which you want to receive attendance
 date and time start of lecture in format: yyyy-mm-dd hh:mm
 -> _date_-_time_-_end_
 date and time start of lecture in format: yyyy-mm-dd hh:mm
--> file-format
+-> _file_-_format_
 format of result file, which contains information about attendance of your query. Formats: tsv, txt, csv, excel
 GOOGLE MODE
 I get message in format: _name_-_of_-_channel_,  _date_-_time_-_start_, _date_-_time_-_end_, google, _min_-_attendance_-_minutes_
--> _name_-_of_-_channel_,  date_-_time_-start_, _date_-_time_-_end_
+-> _name_-_of_-_channel_,  _date_-_time_-_start_, _date_-_time_-_end_
 same as standart mode
 -> google 
 special key word for google mode
