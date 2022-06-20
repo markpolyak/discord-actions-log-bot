@@ -12,6 +12,9 @@ from datetime import datetime, timezone, timedelta
 
 import discord
 from discord import File
+from discord.ext.commands import has_permissions, MissingPermissions
+from discord.ext import commands
+#from discord.ext import bot
 
 from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGGING_BOT, MIN_TIME_DELTA
 
@@ -25,6 +28,9 @@ class LogClient(discord.Client):
     async def on_ready(self):
         logger.info("Logged on as %s!", self.user)
 
+    #@bot.command ( name = 'send' )
+    #@bot.has_permissions( administrator = True )
+    #@bot.bot_has_permissions( administrator = True )
     async def on_message(self, message: discord.Message):
         """
         React on message, if Format is right, than perform actions of atendance
@@ -89,6 +95,10 @@ class LogClient(discord.Client):
                     return
             else:
                 Min_Time_Delta=timedelta(minutes=MIN_TIME_DELTA)
+        #elif (query.channel_name) == NAME_HELP_COMMAND):
+        #    await message.channel.send("Hello, i'm attendance bot. I'll help you to get attendance. Let's check out my functions:")
+        #    help_emb = discord.Embed( title = ''
+               
         else:
             logger.error("Unknown output format %s", query.output_type)
             await message.channel.send(f"Unknown output format {query.output_type}")
@@ -150,8 +160,22 @@ class LogClient(discord.Client):
             if (totalResult==False):
                 await message.channel.send("Can't update google sheet")
             else:
-                await message.channel.send(totalResult)
-                await message.channel.send('Total Discord Errors: ' + str(len(totalErrorsDiscord)) + '\n' + 'Total not enough time for attendance: ' + str(len(totalInfo)))
+                """
+                result_emb=None
+                result_emb = discord.Embed( title = 'RESULT', colour = discord.Color.green())
+                for result in totalResult:
+                    result_emb.add_field(name = str(result), value=str(totalResult[result]), inline=False)
+                result_emb.add_field(name = "Total Discord Errors", value=str(len(totalErrorsDiscord)), inline=False)
+                result_emb.add_field(name = "Total not enough time for attendance ", value=str(len(totalErrorsDiscord)), inline=False)
+                await message.channel.send( embed = result_emb)
+                """
+                result_simple=''
+                for result in totalResult:
+                    result_simple=result_simple+str(result)+' '+ str(totalResult[result])+'\n'            
+                result_simple=result_simple+"Total Discord Errors"+' '+str(len(totalErrorsDiscord))+'\n'
+                result_simple=result_simple+"Total not enough time for attendance "+' '+str(len(totalErrorsDiscord))
+                await message.channel.send(result_simple)
+                    
             # Result for add
             result=('\n'.join(totalErrors)+'\n' if len(totalErrors)>0 else '') + \
                     ('\n'.join(totalWarnings)+'\n' if len(totalWarnings)>0 else '') + \
@@ -355,7 +379,7 @@ def compareToArrayRenderDictByMinTimeDelta(renderDict:dict):
                 ReportEntry.strfdelta(renderDict[username], '{hours:02}:{minutes:02}:{seconds:02}'))
     return totalInfo, renderArray
             
-        
+      
     
 
 if __name__ == '__main__':
