@@ -1,4 +1,4 @@
-Hello, i'm attendance bot. I'll help you to get attendance. Let's check out my functions:
+Hello, i'm attendance bot! I'll help you to get attendance. Let's check out my functions:
 STANDART MODE
 I get message in format: _name_-_of_-_channel_,  _date_-_time_-_start_, _date_-_time_-_end_, _file_-_format_
 -> _name_-_of_-_channel_
