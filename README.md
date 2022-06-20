@@ -73,5 +73,23 @@ Required: setting up bot stage <i>(see upper)</i>.
 8. Examples:
    ```
    General, 2022-02-18 9:30, 2022-02-18 11:00, google
-   General, 2022-02-18 11:00, 2022-02-18 12:30, google, 90:
+   OOP, 2022-02-18 11:00, 2022-02-18 12:30, google, 90:
    ```
+
+
+## Help attendance
+1. You can change name command for help menu in variable NAME_HELP_COMMAND
+2. In varible NAME_HELP_FILE you should write the path to the file, which contain help information (txt-format)
+3. Structure of help informetion:
+   * Simple information, not embed - everu row, while this row is not UPPER
+   * Then cycle for every embed message (starts with UPPER register)
+      + First row (upper row) - embed title
+      + Second row - embed description
+      + Then cycle for every embed field
+         * First row - name field
+         * Second row - value field
+
+<i> If you need to add help - please, set it in this structure.</i> 
+
+<b>Important:</b> <i>every field always have two rows - if you want to add field, than set two rows of information.</i>
+      
