@@ -12,11 +12,10 @@ from datetime import datetime, timezone, timedelta
 
 import discord
 from discord import File
-from discord.ext.commands import has_permissions, MissingPermissions
-from discord.ext import commands
-#from discord.ext import bot
+#from discord.ext.commands import has_permissions, MissingPermissions
+#from discord.ext import commands
 
-from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGGING_BOT, MIN_TIME_DELTA
+from settings import BOT_TOKEN, ALLOWED_ROLE, COMMAND_CHANNEL, LOG_CHANNEL, LOGGING_BOT, MIN_TIME_DELTA, NAME_HELP_COMMAND, NAME_HELP_File
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s :: %(levelname)s :: %(message)s')
@@ -28,9 +27,6 @@ class LogClient(discord.Client):
     async def on_ready(self):
         logger.info("Logged on as %s!", self.user)
 
-    #@bot.command ( name = 'send' )
-    #@bot.has_permissions( administrator = True )
-    #@bot.bot_has_permissions( administrator = True )
     async def on_message(self, message: discord.Message):
         """
         React on message, if Format is right, than perform actions of atendance
@@ -45,11 +41,15 @@ class LogClient(discord.Client):
         if (message.channel.name != COMMAND_CHANNEL
                 or ALLOWED_ROLE not in map(lambda x: x.name, message.author.roles)):
             return
-        await message.channel.send("Please, wait for results...")  
         
         logger.info("Message from %s: %s", message.author, message.content)
+        
+        if (isHelp(message.content)):
+            await sendHelp(message)
+            return 
 
-
+        await message.channel.send("Please, wait for results...")  
+        
         # Parse message
         query = ''
         try:
@@ -69,9 +69,6 @@ class LogClient(discord.Client):
                 
         
         # Render a report
-        #if query.channel_name.lower()==NAME_HELP_COMMAND.lower()
-            #endHelp(message)
-            #return
         if query.output_type == 'tsv':
             sep = '\t'
         elif query.output_type == 'csv':
@@ -98,10 +95,6 @@ class LogClient(discord.Client):
                     return
             else:
                 Min_Time_Delta=timedelta(minutes=MIN_TIME_DELTA)
-        #elif (query.channel_name) == NAME_HELP_COMMAND):
-        #    await message.channel.send("Hello, i'm attendance bot. I'll help you to get attendance. Let's check out my functions:")
-        #    help_emb = discord.Embed( title = ''
-               
         else:
             logger.error("Unknown output format %s", query.output_type)
             await message.channel.send(f"Unknown output format {query.output_type}")
@@ -163,7 +156,6 @@ class LogClient(discord.Client):
             if (totalResult==False):
                 await message.channel.send("Can't update google sheet")
             else:
-
                 result_emb=None
                 result_emb = discord.Embed( title = 'RESULT', colour = discord.Color.green())
                 for result in totalResult:
@@ -172,6 +164,7 @@ class LogClient(discord.Client):
                 result_emb.add_field(name = "Total not enough time for attendance ", value=str(len(totalErrorsDiscord)), inline=False)
                 await message.channel.send( embed = result_emb)
                 """
+                # default print
                 result_simple=''
                 for result in totalResult:
                     result_simple=result_simple+str(result)+' '+ str(totalResult[result])+'\n'            
@@ -208,7 +201,47 @@ async def get_log(log_channel: discord.TextChannel, query: LogQuery) -> [discord
 
     return [x for x in messages if x.author.name == LOGGING_BOT]
 
+def isHelp(message: discord.Message):
+        items = message.replace(',', ';').replace('\n', ';').split(';')
+        if (len(items)==1 and items[0].strip().lower() == NAME_HELP_COMMAND.lower()):
+            return True
+        else:
+            return False
 
+async def sendHelp(message: discord.Message):
+    try:
+        arr=[]
+        with open(NAME_HELP_File, encoding='utf-8') as file:  
+            arr = [row.strip() for row in file]      
+        print (arr)  
+    except Exception  as ex:
+        await message.channel.send("Can't open help file.\n Full text of error: " + str(ex))        
+        """
+        # default print
+        message.channel.send('\n'.join(arr))
+        """
+    try:   
+        index=0 
+        # send basic words
+        while (index<len(arr) and not arr[index].upper()==arr[index]):
+            await message.channel.send(arr[index])
+            index+=1
+        # send embed message
+        while(index < len(arr)):
+            if (len(arr) - index >=2):
+                result_emb=discord.Embed( title = arr[index], description= arr[index+1], colour = discord.Color.blue())
+                index +=2
+            else:
+                break
+               
+            while(len(arr)-index >=2 and not arr[index].upper() == arr[index] ):
+                result_emb.add_field( name = arr[index] ,value=arr[index+1], inline=False)
+                index+=2
+                
+            await message.channel.send( embed = result_emb)
+    except Exception  as ex:
+        await message.channel.send("Something wrong.\n Full text of error: " + str(ex))
+        
 def convert_to_utc(dt: datetime) -> datetime:
     offset = dt.utcoffset()
     return dt.replace(tzinfo=None) - offset
@@ -275,9 +308,9 @@ def parse_log(messages: [discord.Message], query: LogQuery, guild: discord.Guild
 
 class LogQuery:
     channel_name: str
-    date_start: datetime
-    date_end: datetime
-    output_type: str
+    date_start: datetime | None
+    date_end: datetime | None
+    output_type: str | None
     id_google_sheet: str | None
     min_attendance_minutes: str | None
 
@@ -381,12 +414,8 @@ def compareToArrayRenderDictByMinTimeDelta(renderDict:dict):
             totalInfo.append("Person with nick '" +str(username) + "' was not enough time in lectures: " + \
                 ReportEntry.strfdelta(renderDict[username], '{hours:02}:{minutes:02}:{seconds:02}'))
     return totalInfo, renderArray
-            
-#def sendHelp(message: discord.Message)
-#    try:
-#        with open(nameFile, encoding='utf-8') as file:
-#            nicks = [row.strip() for row in file]
-
+           
+       
 
 if __name__ == '__main__':
     intents = discord.Intents.default()
